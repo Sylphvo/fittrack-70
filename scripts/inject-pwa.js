@@ -64,7 +64,7 @@ let html = fs.readFileSync(indexPath, 'utf8');
 const pwaHead = `
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <meta name="apple-mobile-web-app-title" content="FitTrack 70" />
     <meta name="theme-color" content="#090B0E" />
     <link rel="apple-touch-icon" href="${BASE_PATH}/apple-touch-icon.png" />
@@ -78,27 +78,27 @@ const pwaHead = `
         padding: 0;
         width: 100%;
         height: 100%;
+        height: 100dvh;
         overflow: hidden;
-        background-color: #090B0E !important;
+        background-color: #090B0E;
         overscroll-behavior: none;
         -webkit-tap-highlight-color: transparent;
       }
       #root {
-        position: fixed;
-        inset: 0;
         width: 100%;
         height: 100%;
+        height: 100dvh;
         display: flex;
         flex-direction: column;
-        background-color: #090B0E !important;
-        padding-top: env(safe-area-inset-top, 0px);
+        overflow: hidden;
+        background-color: #090B0E;
       }
     </style>
 `;
 
 html = html.replace(
   /<meta name="viewport"[^>]*>/i,
-  '<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />'
+  '<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />'
 );
 
 if (!html.includes('apple-mobile-web-app-capable')) {

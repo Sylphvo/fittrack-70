@@ -1,8 +1,9 @@
-import React, { memo } from 'react';
+import React, { memo, useMemo } from 'react';
 import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import Svg, { Circle, Defs, Line, LinearGradient, Path, Stop } from 'react-native-svg';
 import { FITTRACK_CONFIG } from '../config/fittrack';
-import { COLORS, RADIUS, SPACING } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
+import { RADIUS, SPACING, ThemePalette } from '../theme/tokens';
 
 interface WeightPoint {
   dateKey: string;
@@ -15,7 +16,10 @@ interface WeightChartProps {
 
 export const WeightChart = memo(function WeightChart({ points }: WeightChartProps) {
   const { width } = useWindowDimensions();
-  const chartWidth = Math.max(260, width - SPACING.md * 4);
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
+  const chartWidth = Math.max(260, Math.min(width, 430) - SPACING.md * 4);
   const chartHeight = 160;
   const padX = 16;
   const padY = 18;
@@ -60,18 +64,17 @@ export const WeightChart = memo(function WeightChart({ points }: WeightChartProp
       <Svg width={chartWidth} height={chartHeight}>
         <Defs>
           <LinearGradient id="weightArea" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0%" stopColor={COLORS.emerald} stopOpacity={0.28} />
-            <Stop offset="100%" stopColor={COLORS.emerald} stopOpacity={0} />
+            <Stop offset="0%" stopColor={colors.emerald} stopOpacity={0.28} />
+            <Stop offset="100%" stopColor={colors.emerald} stopOpacity={0} />
           </LinearGradient>
         </Defs>
 
-        {/* Target 70kg dashed line */}
         <Line
           x1={padX}
           y1={targetY}
           x2={chartWidth - padX}
           y2={targetY}
-          stroke={COLORS.emerald}
+          stroke={colors.emerald}
           strokeWidth={1.2}
           strokeDasharray="5 5"
           opacity={0.7}
@@ -83,7 +86,7 @@ export const WeightChart = memo(function WeightChart({ points }: WeightChartProp
           <Path
             d={linePath}
             fill="none"
-            stroke={COLORS.emerald}
+            stroke={colors.emerald}
             strokeWidth={2.5}
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -96,8 +99,8 @@ export const WeightChart = memo(function WeightChart({ points }: WeightChartProp
             cx={pt.x}
             cy={pt.y}
             r={4.5}
-            fill={COLORS.bg}
-            stroke={COLORS.emerald}
+            fill={colors.surface}
+            stroke={colors.emerald}
             strokeWidth={2.5}
           />
         ))}
@@ -115,39 +118,40 @@ export const WeightChart = memo(function WeightChart({ points }: WeightChartProp
   );
 });
 
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    padding: SPACING.md,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: SPACING.xs,
-  },
-  title: {
-    color: COLORS.textPrimary,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  legend: {
-    color: COLORS.emerald,
-    fontSize: 12,
-    fontWeight: '600',
-    fontVariant: ['tabular-nums'],
-  },
-  axisRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 4,
-  },
-  axisLabel: {
-    color: COLORS.textSecondary,
-    fontSize: 12,
-    fontVariant: ['tabular-nums'],
-  },
-});
+const createStyles = (c: ThemePalette) =>
+  StyleSheet.create({
+    card: {
+      backgroundColor: c.surface,
+      borderRadius: RADIUS.lg,
+      borderWidth: 1,
+      borderColor: c.border,
+      padding: SPACING.md,
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: SPACING.xs,
+    },
+    title: {
+      color: c.textPrimary,
+      fontSize: 15,
+      fontWeight: '700',
+    },
+    legend: {
+      color: c.emerald,
+      fontSize: 12,
+      fontWeight: '600',
+      fontVariant: ['tabular-nums'],
+    },
+    axisRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginTop: 4,
+    },
+    axisLabel: {
+      color: c.textSecondary,
+      fontSize: 12,
+      fontVariant: ['tabular-nums'],
+    },
+  });

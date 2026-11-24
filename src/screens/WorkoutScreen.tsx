@@ -1,9 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { EVENING_WORKOUT_PLAN, FITTRACK_CONFIG } from '../config/fittrack';
-import { COLORS, RADIUS, SPACING, TYPO } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
+import { RADIUS, SPACING, ThemePalette, TYPO } from '../theme/tokens';
 
 interface WorkoutScreenProps {
   completedWorkouts: string[];
@@ -25,12 +26,15 @@ export function WorkoutScreen({
   onToggleWorkout,
   onUpdateCardioElapsed,
 }: WorkoutScreenProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const [elapsed, setElapsed] = useState(cardioElapsedSec);
   const [isRunning, setIsRunning] = useState(false);
   const prevPhaseRef = useRef<'walk' | 'run'>('walk');
 
   const totalSec = FITTRACK_CONFIG.CARDIO_TOTAL_SECONDS;
-  const cycleSec = FITTRACK_CONFIG.CARDIO_WALK_SECONDS + FITTRACK_CONFIG.CARDIO_RUN_SECONDS; // 240s = 4m
+  const cycleSec = FITTRACK_CONFIG.CARDIO_WALK_SECONDS + FITTRACK_CONFIG.CARDIO_RUN_SECONDS;
   const remainingSec = Math.max(0, totalSec - elapsed);
   const progressPct = Math.min(100, (elapsed / totalSec) * 100);
 
@@ -63,7 +67,6 @@ export function WorkoutScreen({
     return () => clearInterval(timer);
   }, [isRunning, totalSec, onUpdateCardioElapsed]);
 
-  // Haptic alert when transitioning between 3-min Brisk Walk and 1-min Run/Stairs
   useEffect(() => {
     const currentPhase: 'walk' | 'run' = isRunPhase ? 'run' : 'walk';
     if (isRunning && prevPhaseRef.current !== currentPhase) {
@@ -109,44 +112,40 @@ export function WorkoutScreen({
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
-      {/* Header */}
       <View style={styles.headerRow}>
         <View>
           <Text style={styles.kicker}>SAU GIỜ LÀM · {FITTRACK_CONFIG.WORKOUT_WINDOW}</Text>
-          <Text style={[TYPO.title, { color: COLORS.textPrimary }]}>Kế hoạch vận động</Text>
+          <Text style={[TYPO.title, { color: colors.textPrimary }]}>Kế hoạch vận động</Text>
         </View>
         <View style={styles.burnPill}>
-          <Ionicons name="flash" size={14} color={COLORS.emerald} />
+          <Ionicons name="flash" size={14} color={colors.emerald} />
           <Text style={styles.burnText}>~{burnedKcal} kcal</Text>
         </View>
       </View>
 
-      {/* 40-Minute Interval Cardio Timer */}
       <View
         style={[
           styles.timerCard,
-          { borderColor: isRunPhase ? COLORS.amberBorder : COLORS.emeraldBorder },
+          { borderColor: isRunPhase ? colors.amberBorder : colors.emeraldBorder },
         ]}
       >
         <View style={styles.timerTopRow}>
           <View
             style={[
               styles.phasePill,
-              {
-                backgroundColor: isRunPhase ? COLORS.amberDim : COLORS.emeraldDim,
-              },
+              { backgroundColor: isRunPhase ? colors.amberDim : colors.emeraldDim },
             ]}
           >
             <View
               style={[
                 styles.phaseDot,
-                { backgroundColor: isRunPhase ? COLORS.amber : COLORS.emerald },
+                { backgroundColor: isRunPhase ? colors.amber : colors.emerald },
               ]}
             />
             <Text
               style={[
                 styles.phaseText,
-                { color: isRunPhase ? COLORS.amber : COLORS.emerald },
+                { color: isRunPhase ? colors.amber : colors.emerald },
               ]}
             >
               {elapsed >= totalSec
@@ -163,14 +162,13 @@ export function WorkoutScreen({
           Vòng {currentRound} / 10  ·  Đổi nhịp sau {formatClock(phaseRemaining)}
         </Text>
 
-        {/* Progress Bar */}
         <View style={styles.progressTrack}>
           <View
             style={[
               styles.progressFill,
               {
                 width: `${progressPct}%`,
-                backgroundColor: isRunPhase ? COLORS.amber : COLORS.emerald,
+                backgroundColor: isRunPhase ? colors.amber : colors.emerald,
               },
             ]}
           />
@@ -183,14 +181,14 @@ export function WorkoutScreen({
             accessibilityRole="button"
             accessibilityLabel="Đặt lại đồng hồ 40 phút"
           >
-            <Ionicons name="refresh" size={20} color={COLORS.textPrimary} />
+            <Ionicons name="refresh" size={20} color={colors.textPrimary} />
             <Text style={styles.secondaryBtnText}>Đặt lại</Text>
           </Pressable>
 
           <Pressable
             style={({ pressed }) => [
               styles.primaryBtn,
-              { backgroundColor: isRunning ? COLORS.amber : COLORS.emerald },
+              { backgroundColor: isRunning ? colors.amber : colors.emerald },
               pressed && styles.pressed,
             ]}
             onPress={handleStartPause}
@@ -200,7 +198,7 @@ export function WorkoutScreen({
             <Ionicons
               name={isRunning ? 'pause' : 'play'}
               size={20}
-              color={COLORS.black}
+              color={colors.onAccent}
             />
             <Text style={styles.primaryBtnText}>
               {isRunning ? 'Tạm dừng' : elapsed > 0 && elapsed < totalSec ? 'Tiếp tục' : 'Bắt đầu 40p'}
@@ -209,9 +207,8 @@ export function WorkoutScreen({
         </View>
       </View>
 
-      {/* Fixed Evening Schedule */}
       <View style={styles.sectionHeader}>
-        <Text style={[TYPO.sectionTitle, { color: COLORS.textPrimary }]}>
+        <Text style={[TYPO.sectionTitle, { color: colors.textPrimary }]}>
           Lịch trình cố định ({completedWorkouts.length}/{EVENING_WORKOUT_PLAN.length})
         </Text>
         <Text style={styles.sectionHint}>Tổng ~530 kcal</Text>
@@ -234,7 +231,7 @@ export function WorkoutScreen({
               accessibilityLabel={`${item.time} ${item.title}`}
             >
               <View style={styles.timeCol}>
-                <Text style={[styles.timeText, done && { color: COLORS.emerald }]}>
+                <Text style={[styles.timeText, done && { color: colors.emerald }]}>
                   {item.time}
                 </Text>
                 <Text style={styles.durationText}>{item.durationMin}p</Text>
@@ -251,16 +248,15 @@ export function WorkoutScreen({
               <Ionicons
                 name={done ? 'checkmark-circle' : 'ellipse-outline'}
                 size={26}
-                color={done ? COLORS.emerald : COLORS.textMuted}
+                color={done ? colors.emerald : colors.textMuted}
               />
             </Pressable>
           );
         })}
       </View>
 
-      {/* Coaching Tip */}
       <View style={styles.tipCard}>
-        <Ionicons name="shield-checkmark-outline" size={18} color={COLORS.cyan} />
+        <Ionicons name="shield-checkmark-outline" size={18} color={colors.cyan} />
         <Text style={styles.tipText}>
           Kỹ thuật an toàn: Khi đẩy con lăn 4 bánh luôn gồng chặt cơ bụng, tuyệt đối không võng
           lưng dưới. Uống thêm nước chanh muối loãng sau buổi tập để bù điện giải.
@@ -270,216 +266,217 @@ export function WorkoutScreen({
   );
 }
 
-const styles = StyleSheet.create({
-  flex: { flex: 1 },
-  content: {
-    padding: SPACING.md,
-    paddingBottom: 36,
-    gap: SPACING.md,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  kicker: {
-    color: COLORS.textMuted,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.9,
-  },
-  burnPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: COLORS.emeraldDim,
-    borderWidth: 1,
-    borderColor: COLORS.emeraldBorder,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: RADIUS.full,
-  },
-  burnText: {
-    color: COLORS.emerald,
-    fontSize: 12,
-    fontWeight: '700',
-    fontVariant: ['tabular-nums'],
-  },
-  timerCard: {
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    padding: SPACING.lg,
-    alignItems: 'center',
-    gap: 12,
-  },
-  timerTopRow: {
-    width: '100%',
-    alignItems: 'center',
-  },
-  phasePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: RADIUS.full,
-  },
-  phaseDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-  },
-  phaseText: {
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.4,
-  },
-  clockBig: {
-    color: COLORS.textPrimary,
-    fontSize: 56,
-    fontWeight: '800',
-    letterSpacing: -1.5,
-    fontVariant: ['tabular-nums'],
-  },
-  clockSub: {
-    color: COLORS.textSecondary,
-    fontSize: 13,
-    fontWeight: '600',
-    fontVariant: ['tabular-nums'],
-  },
-  progressTrack: {
-    width: '100%',
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: COLORS.border,
-    overflow: 'hidden',
-    marginTop: 4,
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  timerControls: {
-    flexDirection: 'row',
-    width: '100%',
-    gap: SPACING.sm,
-    marginTop: 6,
-  },
-  secondaryBtn: {
-    height: 48,
-    paddingHorizontal: 16,
-    borderRadius: RADIUS.md,
-    backgroundColor: COLORS.surfaceElevated,
-    borderWidth: 1,
-    borderColor: COLORS.borderStrong,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  secondaryBtnText: {
-    color: COLORS.textPrimary,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  primaryBtn: {
-    flex: 1,
-    height: 48,
-    borderRadius: RADIUS.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  primaryBtnText: {
-    color: COLORS.black,
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-  },
-  sectionHint: {
-    color: COLORS.textMuted,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  listGap: {
-    gap: SPACING.sm,
-  },
-  workoutCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    padding: 14,
-  },
-  workoutCardDone: {
-    borderColor: COLORS.emeraldBorder,
-    backgroundColor: COLORS.surfaceMuted,
-  },
-  timeCol: {
-    width: 50,
-    alignItems: 'center',
-    paddingVertical: 6,
-    borderRadius: RADIUS.sm,
-    backgroundColor: COLORS.surfaceElevated,
-  },
-  timeText: {
-    color: COLORS.textPrimary,
-    fontSize: 13,
-    fontWeight: '800',
-    fontVariant: ['tabular-nums'],
-  },
-  durationText: {
-    color: COLORS.textMuted,
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  workoutTitle: {
-    color: COLORS.textPrimary,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  workoutTitleDone: {
-    color: COLORS.textSecondary,
-    textDecorationLine: 'line-through',
-  },
-  workoutDetail: {
-    color: COLORS.textSecondary,
-    fontSize: 12,
-    lineHeight: 17,
-    marginTop: 2,
-  },
-  workoutBurn: {
-    color: COLORS.emerald,
-    fontSize: 11,
-    fontWeight: '700',
-    marginTop: 4,
-  },
-  tipCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    backgroundColor: COLORS.cyanDim,
-    borderWidth: 1,
-    borderColor: COLORS.cyanBorder,
-    borderRadius: RADIUS.md,
-    padding: 14,
-  },
-  tipText: {
-    flex: 1,
-    color: COLORS.textPrimary,
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  pressed: {
-    opacity: 0.78,
-  },
-});
+const createStyles = (c: ThemePalette) =>
+  StyleSheet.create({
+    flex: { flex: 1 },
+    content: {
+      padding: SPACING.md,
+      paddingBottom: 28,
+      gap: SPACING.md,
+    },
+    headerRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    kicker: {
+      color: c.textMuted,
+      fontSize: 11,
+      fontWeight: '700',
+      letterSpacing: 0.9,
+    },
+    burnPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      backgroundColor: c.emeraldDim,
+      borderWidth: 1,
+      borderColor: c.emeraldBorder,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: RADIUS.full,
+    },
+    burnText: {
+      color: c.emerald,
+      fontSize: 12,
+      fontWeight: '700',
+      fontVariant: ['tabular-nums'],
+    },
+    timerCard: {
+      backgroundColor: c.surface,
+      borderRadius: RADIUS.lg,
+      borderWidth: 1,
+      padding: SPACING.lg,
+      alignItems: 'center',
+      gap: 12,
+    },
+    timerTopRow: {
+      width: '100%',
+      alignItems: 'center',
+    },
+    phasePill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: RADIUS.full,
+    },
+    phaseDot: {
+      width: 7,
+      height: 7,
+      borderRadius: 4,
+    },
+    phaseText: {
+      fontSize: 11,
+      fontWeight: '800',
+      letterSpacing: 0.4,
+    },
+    clockBig: {
+      color: c.textPrimary,
+      fontSize: 56,
+      fontWeight: '800',
+      letterSpacing: -1.5,
+      fontVariant: ['tabular-nums'],
+    },
+    clockSub: {
+      color: c.textSecondary,
+      fontSize: 13,
+      fontWeight: '600',
+      fontVariant: ['tabular-nums'],
+    },
+    progressTrack: {
+      width: '100%',
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: c.border,
+      overflow: 'hidden',
+      marginTop: 4,
+    },
+    progressFill: {
+      height: '100%',
+      borderRadius: 4,
+    },
+    timerControls: {
+      flexDirection: 'row',
+      width: '100%',
+      gap: SPACING.sm,
+      marginTop: 6,
+    },
+    secondaryBtn: {
+      height: 48,
+      paddingHorizontal: 16,
+      borderRadius: RADIUS.md,
+      backgroundColor: c.surfaceElevated,
+      borderWidth: 1,
+      borderColor: c.borderStrong,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+    },
+    secondaryBtnText: {
+      color: c.textPrimary,
+      fontSize: 14,
+      fontWeight: '700',
+    },
+    primaryBtn: {
+      flex: 1,
+      height: 48,
+      borderRadius: RADIUS.md,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+    },
+    primaryBtnText: {
+      color: c.onAccent,
+      fontSize: 15,
+      fontWeight: '800',
+    },
+    sectionHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'baseline',
+    },
+    sectionHint: {
+      color: c.textMuted,
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    listGap: {
+      gap: SPACING.sm,
+    },
+    workoutCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      backgroundColor: c.surface,
+      borderRadius: RADIUS.md,
+      borderWidth: 1,
+      borderColor: c.border,
+      padding: 14,
+    },
+    workoutCardDone: {
+      borderColor: c.emeraldBorder,
+      backgroundColor: c.surfaceMuted,
+    },
+    timeCol: {
+      width: 50,
+      alignItems: 'center',
+      paddingVertical: 6,
+      borderRadius: RADIUS.sm,
+      backgroundColor: c.surfaceElevated,
+    },
+    timeText: {
+      color: c.textPrimary,
+      fontSize: 13,
+      fontWeight: '800',
+      fontVariant: ['tabular-nums'],
+    },
+    durationText: {
+      color: c.textMuted,
+      fontSize: 11,
+      fontWeight: '600',
+    },
+    workoutTitle: {
+      color: c.textPrimary,
+      fontSize: 15,
+      fontWeight: '700',
+    },
+    workoutTitleDone: {
+      color: c.textSecondary,
+      textDecorationLine: 'line-through',
+    },
+    workoutDetail: {
+      color: c.textSecondary,
+      fontSize: 12,
+      lineHeight: 17,
+      marginTop: 2,
+    },
+    workoutBurn: {
+      color: c.emerald,
+      fontSize: 11,
+      fontWeight: '700',
+      marginTop: 4,
+    },
+    tipCard: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 10,
+      backgroundColor: c.cyanDim,
+      borderWidth: 1,
+      borderColor: c.cyanBorder,
+      borderRadius: RADIUS.md,
+      padding: 14,
+    },
+    tipText: {
+      flex: 1,
+      color: c.textPrimary,
+      fontSize: 12,
+      lineHeight: 18,
+    },
+    pressed: {
+      opacity: 0.78,
+    },
+  });

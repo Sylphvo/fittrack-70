@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -23,7 +23,8 @@ import {
   saveGeminiApiKey,
 } from '../services/aiCoach';
 import { getTimeStamp } from '../store/useFitTrackStore';
-import { COLORS, RADIUS, SPACING, TYPO } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
+import { RADIUS, SPACING, ThemePalette, TYPO } from '../theme/tokens';
 import { ChatMessage } from '../types/fittrack';
 
 interface AiCoachScreenProps {
@@ -46,6 +47,9 @@ const WELCOME_MSG: ChatMessage = {
 };
 
 export function AiCoachScreen({ context, onAddMeal }: AiCoachScreenProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MSG]);
   const [input, setInput] = useState('');
   const [isBusy, setIsBusy] = useState(false);
@@ -121,7 +125,9 @@ export function AiCoachScreen({ context, onAddMeal }: AiCoachScreenProps) {
     }
   };
 
-  const pickWebFile = (useCamera: boolean): Promise<{ uri: string; base64: string; mimeType: string } | null> => {
+  const pickWebFile = (
+    useCamera: boolean
+  ): Promise<{ uri: string; base64: string; mimeType: string } | null> => {
     return new Promise((resolve) => {
       if (typeof document === 'undefined') {
         resolve(null);
@@ -275,11 +281,10 @@ export function AiCoachScreen({ context, onAddMeal }: AiCoachScreenProps) {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
     >
-      {/* Top Header */}
       <View style={styles.header}>
         <View>
           <Text style={styles.kicker}>GEMINI VISION · TRỢ LÝ ZERO-STARCH</Text>
-          <Text style={[TYPO.title, { color: COLORS.textPrimary }]}>Quét Calo & Chat AI</Text>
+          <Text style={[TYPO.title, { color: colors.textPrimary }]}>Quét Calo & Chat AI</Text>
         </View>
         <Pressable
           style={({ pressed }) => [
@@ -294,24 +299,25 @@ export function AiCoachScreen({ context, onAddMeal }: AiCoachScreenProps) {
           <Ionicons
             name={apiKey ? 'key' : 'key-outline'}
             size={15}
-            color={apiKey ? COLORS.emerald : COLORS.amber}
+            color={apiKey ? colors.emerald : colors.amber}
           />
-          <Text style={[styles.keyBtnText, { color: apiKey ? COLORS.emerald : COLORS.amber }]}>
+          <Text style={[styles.keyBtnText, { color: apiKey ? colors.emerald : colors.amber }]}>
             {apiKey ? 'Gemini Live' : 'Demo · Nhập Key'}
           </Text>
         </Pressable>
       </View>
 
-      {/* Collapsible Gemini API Key Panel */}
       {showKeyPanel ? (
         <View style={styles.keyPanel}>
-          <Text style={styles.keyPanelTitle}>Cấu hình Gemini API Key (miễn phí tại aistudio.google.com)</Text>
+          <Text style={styles.keyPanelTitle}>
+            Cấu hình Gemini API Key (miễn phí tại aistudio.google.com)
+          </Text>
           <View style={styles.keyInputRow}>
             <TextInput
               value={draftKey}
               onChangeText={setDraftKey}
               placeholder="Dán khóa AIza... (để trống = chế độ Demo)"
-              placeholderTextColor={COLORS.textMuted}
+              placeholderTextColor={colors.textMuted}
               autoCapitalize="none"
               autoCorrect={false}
               secureTextEntry
@@ -330,7 +336,6 @@ export function AiCoachScreen({ context, onAddMeal }: AiCoachScreenProps) {
         </View>
       ) : null}
 
-      {/* Camera & Photo Picker Action Strip */}
       <View style={styles.scanBar}>
         <Pressable
           style={({ pressed }) => [styles.scanBtnPrimary, pressed && styles.pressed]}
@@ -339,7 +344,7 @@ export function AiCoachScreen({ context, onAddMeal }: AiCoachScreenProps) {
           accessibilityRole="button"
           accessibilityLabel="Chụp ảnh món ăn để xem calo"
         >
-          <Ionicons name="camera" size={18} color={COLORS.black} />
+          <Ionicons name="camera" size={18} color={colors.onAccent} />
           <Text style={styles.scanBtnPrimaryText}>Chụp món ăn</Text>
         </Pressable>
 
@@ -350,12 +355,11 @@ export function AiCoachScreen({ context, onAddMeal }: AiCoachScreenProps) {
           accessibilityRole="button"
           accessibilityLabel="Chọn ảnh món ăn từ thư viện"
         >
-          <Ionicons name="images-outline" size={18} color={COLORS.textPrimary} />
+          <Ionicons name="images-outline" size={18} color={colors.textPrimary} />
           <Text style={styles.scanBtnSecondaryText}>Chọn ảnh có sẵn</Text>
         </Pressable>
       </View>
 
-      {/* Chat Messages Thread */}
       <ScrollView
         ref={scrollRef}
         style={styles.flex}
@@ -368,10 +372,10 @@ export function AiCoachScreen({ context, onAddMeal }: AiCoachScreenProps) {
           const scan = msg.scanResult;
           const verdictColor =
             scan?.verdict === 'an_toan'
-              ? COLORS.emerald
+              ? colors.emerald
               : scan?.verdict === 'nen_tranh'
-                ? COLORS.coral
-                : COLORS.amber;
+                ? colors.coral
+                : colors.amber;
           const verdictLabel =
             scan?.verdict === 'an_toan'
               ? 'Chuẩn Zero-Starch'
@@ -403,10 +407,10 @@ export function AiCoachScreen({ context, onAddMeal }: AiCoachScreenProps) {
                           {
                             backgroundColor:
                               scan.verdict === 'an_toan'
-                                ? COLORS.emeraldDim
+                                ? colors.emeraldDim
                                 : scan.verdict === 'nen_tranh'
-                                  ? COLORS.coralDim
-                                  : COLORS.amberDim,
+                                  ? colors.coralDim
+                                  : colors.amberDim,
                           },
                         ]}
                       >
@@ -419,13 +423,13 @@ export function AiCoachScreen({ context, onAddMeal }: AiCoachScreenProps) {
                     <View style={styles.scanMetricsRow}>
                       <View style={styles.scanMetricBox}>
                         <Text style={styles.scanMetricLabel}>Ước tính Calo</Text>
-                        <Text style={[styles.scanMetricVal, { color: COLORS.emerald }]}>
+                        <Text style={[styles.scanMetricVal, { color: colors.emerald }]}>
                           {scan.estimatedKcal} kcal
                         </Text>
                       </View>
                       <View style={styles.scanMetricBox}>
                         <Text style={styles.scanMetricLabel}>Ước tính Đạm</Text>
-                        <Text style={[styles.scanMetricVal, { color: COLORS.amber }]}>
+                        <Text style={[styles.scanMetricVal, { color: colors.amber }]}>
                           {scan.estimatedProtein}g
                         </Text>
                       </View>
@@ -434,7 +438,7 @@ export function AiCoachScreen({ context, onAddMeal }: AiCoachScreenProps) {
                         <Text
                           style={[
                             styles.scanMetricVal,
-                            { color: scan.hasStarch ? COLORS.coral : COLORS.cyan },
+                            { color: scan.hasStarch ? colors.coral : colors.cyan },
                           ]}
                         >
                           {scan.hasStarch ? 'Có' : '0%'}
@@ -456,12 +460,12 @@ export function AiCoachScreen({ context, onAddMeal }: AiCoachScreenProps) {
                       <Ionicons
                         name={msg.addedToLog ? 'checkmark-circle' : 'add-circle'}
                         size={17}
-                        color={msg.addedToLog ? COLORS.emerald : COLORS.black}
+                        color={msg.addedToLog ? colors.emerald : colors.onAccent}
                       />
                       <Text
                         style={[
                           styles.addMealBtnText,
-                          msg.addedToLog && { color: COLORS.emerald },
+                          msg.addedToLog && { color: colors.emerald },
                         ]}
                       >
                         {msg.addedToLog
@@ -483,13 +487,12 @@ export function AiCoachScreen({ context, onAddMeal }: AiCoachScreenProps) {
 
         {isBusy ? (
           <View style={styles.loadingRow}>
-            <ActivityIndicator size="small" color={COLORS.emerald} />
+            <ActivityIndicator size="small" color={colors.emerald} />
             <Text style={styles.loadingText}>AI đang phân tích dữ liệu...</Text>
           </View>
         ) : null}
       </ScrollView>
 
-      {/* Quick Prompts */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -508,13 +511,12 @@ export function AiCoachScreen({ context, onAddMeal }: AiCoachScreenProps) {
         ))}
       </ScrollView>
 
-      {/* Chat Input Bar */}
       <View style={styles.inputBar}>
         <TextInput
           value={input}
           onChangeText={setInput}
           placeholder="Hỏi AI về món ăn, calo, lịch tập..."
-          placeholderTextColor={COLORS.textMuted}
+          placeholderTextColor={colors.textMuted}
           style={styles.chatInput}
           returnKeyType="send"
           onSubmitEditing={() => handleSendText()}
@@ -531,320 +533,321 @@ export function AiCoachScreen({ context, onAddMeal }: AiCoachScreenProps) {
           accessibilityRole="button"
           accessibilityLabel="Gửi tin nhắn"
         >
-          <Ionicons name="send" size={18} color={COLORS.black} />
+          <Ionicons name="send" size={18} color={colors.onAccent} />
         </Pressable>
       </View>
     </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({
-  flex: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.md,
-    paddingBottom: SPACING.sm,
-  },
-  kicker: {
-    color: COLORS.textMuted,
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.9,
-  },
-  keyBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 11,
-    paddingVertical: 7,
-    borderRadius: RADIUS.full,
-    backgroundColor: COLORS.amberDim,
-    borderWidth: 1,
-    borderColor: COLORS.amberBorder,
-  },
-  keyBtnActive: {
-    backgroundColor: COLORS.emeraldDim,
-    borderColor: COLORS.emeraldBorder,
-  },
-  keyBtnText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  keyPanel: {
-    marginHorizontal: SPACING.md,
-    marginBottom: SPACING.sm,
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: COLORS.borderStrong,
-    padding: 12,
-    gap: 8,
-  },
-  keyPanelTitle: {
-    color: COLORS.textSecondary,
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  keyInputRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  keyInput: {
-    flex: 1,
-    height: 40,
-    backgroundColor: COLORS.bg,
-    borderWidth: 1,
-    borderColor: COLORS.borderStrong,
-    borderRadius: RADIUS.sm,
-    paddingHorizontal: 10,
-    color: COLORS.textPrimary,
-    fontSize: 13,
-  },
-  keySaveBtn: {
-    height: 40,
-    paddingHorizontal: 16,
-    borderRadius: RADIUS.sm,
-    backgroundColor: COLORS.emerald,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  keySaveText: {
-    color: COLORS.black,
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  scanBar: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    paddingHorizontal: SPACING.md,
-    paddingBottom: SPACING.sm,
-  },
-  scanBtnPrimary: {
-    flex: 1,
-    minHeight: 44,
-    borderRadius: RADIUS.md,
-    backgroundColor: COLORS.emerald,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 7,
-  },
-  scanBtnPrimaryText: {
-    color: COLORS.black,
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  scanBtnSecondary: {
-    flex: 1,
-    minHeight: 44,
-    borderRadius: RADIUS.md,
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.borderStrong,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 7,
-  },
-  scanBtnSecondaryText: {
-    color: COLORS.textPrimary,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  chatContent: {
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    gap: 12,
-  },
-  bubbleRow: {
-    flexDirection: 'row',
-    width: '100%',
-  },
-  bubbleRowUser: {
-    justifyContent: 'flex-end',
-  },
-  bubbleRowAi: {
-    justifyContent: 'flex-start',
-  },
-  bubble: {
-    maxWidth: '88%',
-    borderRadius: RADIUS.md,
-    padding: 12,
-    gap: 8,
-  },
-  bubbleUser: {
-    backgroundColor: COLORS.emerald,
-    borderBottomRightRadius: 4,
-  },
-  bubbleAi: {
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderBottomLeftRadius: 4,
-  },
-  previewImage: {
-    width: 220,
-    height: 150,
-    borderRadius: RADIUS.sm,
-    backgroundColor: COLORS.bg,
-  },
-  scanCard: {
-    backgroundColor: COLORS.surfaceMuted,
-    borderRadius: RADIUS.sm,
-    borderWidth: 1,
-    borderColor: COLORS.borderStrong,
-    padding: 10,
-    gap: 10,
-  },
-  scanCardTop: {
-    gap: 6,
-  },
-  scanDishName: {
-    color: COLORS.textPrimary,
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  verdictPill: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: RADIUS.full,
-  },
-  verdictText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  scanMetricsRow: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  scanMetricBox: {
-    flex: 1,
-    backgroundColor: COLORS.bg,
-    borderRadius: 8,
-    paddingVertical: 7,
-    paddingHorizontal: 6,
-    alignItems: 'center',
-  },
-  scanMetricLabel: {
-    color: COLORS.textMuted,
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  scanMetricVal: {
-    fontSize: 13,
-    fontWeight: '800',
-    marginTop: 2,
-    fontVariant: ['tabular-nums'],
-  },
-  addMealBtn: {
-    minHeight: 38,
-    borderRadius: RADIUS.sm,
-    backgroundColor: COLORS.emerald,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-  },
-  addMealBtnDone: {
-    backgroundColor: COLORS.emeraldDim,
-    borderWidth: 1,
-    borderColor: COLORS.emeraldBorder,
-  },
-  addMealBtnText: {
-    color: COLORS.black,
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  msgText: {
-    color: COLORS.textPrimary,
-    fontSize: 13.5,
-    lineHeight: 20,
-  },
-  msgTextUser: {
-    color: COLORS.black,
-    fontWeight: '600',
-  },
-  timeLabel: {
-    color: COLORS.textMuted,
-    fontSize: 10,
-    alignSelf: 'flex-end',
-    fontVariant: ['tabular-nums'],
-  },
-  timeLabelUser: {
-    color: 'rgba(0,0,0,0.6)',
-  },
-  loadingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 6,
-  },
-  loadingText: {
-    color: COLORS.textSecondary,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  chipsScroll: {
-    maxHeight: 42,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-  },
-  chipsRow: {
-    paddingHorizontal: SPACING.md,
-    alignItems: 'center',
-    gap: 8,
-  },
-  chip: {
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.borderStrong,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: RADIUS.full,
-  },
-  chipText: {
-    color: COLORS.textSecondary,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  inputBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: 10,
-    backgroundColor: COLORS.surfaceMuted,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-  },
-  chatInput: {
-    flex: 1,
-    minHeight: 44,
-    backgroundColor: COLORS.bg,
-    borderWidth: 1,
-    borderColor: COLORS.borderStrong,
-    borderRadius: RADIUS.full,
-    paddingHorizontal: 16,
-    color: COLORS.textPrimary,
-    fontSize: 14,
-  },
-  sendBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: COLORS.emerald,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sendBtnDisabled: {
-    opacity: 0.4,
-  },
-  pressed: {
-    opacity: 0.78,
-  },
-});
+const createStyles = (c: ThemePalette) =>
+  StyleSheet.create({
+    flex: { flex: 1 },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: SPACING.md,
+      paddingTop: SPACING.md,
+      paddingBottom: SPACING.sm,
+    },
+    kicker: {
+      color: c.textMuted,
+      fontSize: 10,
+      fontWeight: '700',
+      letterSpacing: 0.9,
+    },
+    keyBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      paddingHorizontal: 11,
+      paddingVertical: 7,
+      borderRadius: RADIUS.full,
+      backgroundColor: c.amberDim,
+      borderWidth: 1,
+      borderColor: c.amberBorder,
+    },
+    keyBtnActive: {
+      backgroundColor: c.emeraldDim,
+      borderColor: c.emeraldBorder,
+    },
+    keyBtnText: {
+      fontSize: 11,
+      fontWeight: '700',
+    },
+    keyPanel: {
+      marginHorizontal: SPACING.md,
+      marginBottom: SPACING.sm,
+      backgroundColor: c.surface,
+      borderRadius: RADIUS.md,
+      borderWidth: 1,
+      borderColor: c.borderStrong,
+      padding: 12,
+      gap: 8,
+    },
+    keyPanelTitle: {
+      color: c.textSecondary,
+      fontSize: 11,
+      fontWeight: '600',
+    },
+    keyInputRow: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    keyInput: {
+      flex: 1,
+      height: 40,
+      backgroundColor: c.bg,
+      borderWidth: 1,
+      borderColor: c.borderStrong,
+      borderRadius: RADIUS.sm,
+      paddingHorizontal: 10,
+      color: c.textPrimary,
+      fontSize: 13,
+    },
+    keySaveBtn: {
+      height: 40,
+      paddingHorizontal: 16,
+      borderRadius: RADIUS.sm,
+      backgroundColor: c.emerald,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    keySaveText: {
+      color: c.onAccent,
+      fontSize: 13,
+      fontWeight: '800',
+    },
+    scanBar: {
+      flexDirection: 'row',
+      gap: SPACING.sm,
+      paddingHorizontal: SPACING.md,
+      paddingBottom: SPACING.sm,
+    },
+    scanBtnPrimary: {
+      flex: 1,
+      minHeight: 44,
+      borderRadius: RADIUS.md,
+      backgroundColor: c.emerald,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 7,
+    },
+    scanBtnPrimaryText: {
+      color: c.onAccent,
+      fontSize: 13,
+      fontWeight: '800',
+    },
+    scanBtnSecondary: {
+      flex: 1,
+      minHeight: 44,
+      borderRadius: RADIUS.md,
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.borderStrong,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 7,
+    },
+    scanBtnSecondaryText: {
+      color: c.textPrimary,
+      fontSize: 13,
+      fontWeight: '700',
+    },
+    chatContent: {
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.sm,
+      gap: 12,
+    },
+    bubbleRow: {
+      flexDirection: 'row',
+      width: '100%',
+    },
+    bubbleRowUser: {
+      justifyContent: 'flex-end',
+    },
+    bubbleRowAi: {
+      justifyContent: 'flex-start',
+    },
+    bubble: {
+      maxWidth: '88%',
+      borderRadius: RADIUS.md,
+      padding: 12,
+      gap: 8,
+    },
+    bubbleUser: {
+      backgroundColor: c.emerald,
+      borderBottomRightRadius: 4,
+    },
+    bubbleAi: {
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.border,
+      borderBottomLeftRadius: 4,
+    },
+    previewImage: {
+      width: 220,
+      height: 150,
+      borderRadius: RADIUS.sm,
+      backgroundColor: c.bg,
+    },
+    scanCard: {
+      backgroundColor: c.surfaceMuted,
+      borderRadius: RADIUS.sm,
+      borderWidth: 1,
+      borderColor: c.borderStrong,
+      padding: 10,
+      gap: 10,
+    },
+    scanCardTop: {
+      gap: 6,
+    },
+    scanDishName: {
+      color: c.textPrimary,
+      fontSize: 14,
+      fontWeight: '800',
+    },
+    verdictPill: {
+      alignSelf: 'flex-start',
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: RADIUS.full,
+    },
+    verdictText: {
+      fontSize: 11,
+      fontWeight: '700',
+    },
+    scanMetricsRow: {
+      flexDirection: 'row',
+      gap: 6,
+    },
+    scanMetricBox: {
+      flex: 1,
+      backgroundColor: c.bg,
+      borderRadius: 8,
+      paddingVertical: 7,
+      paddingHorizontal: 6,
+      alignItems: 'center',
+    },
+    scanMetricLabel: {
+      color: c.textMuted,
+      fontSize: 10,
+      fontWeight: '600',
+    },
+    scanMetricVal: {
+      fontSize: 13,
+      fontWeight: '800',
+      marginTop: 2,
+      fontVariant: ['tabular-nums'],
+    },
+    addMealBtn: {
+      minHeight: 38,
+      borderRadius: RADIUS.sm,
+      backgroundColor: c.emerald,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingHorizontal: 10,
+    },
+    addMealBtnDone: {
+      backgroundColor: c.emeraldDim,
+      borderWidth: 1,
+      borderColor: c.emeraldBorder,
+    },
+    addMealBtnText: {
+      color: c.onAccent,
+      fontSize: 12,
+      fontWeight: '800',
+    },
+    msgText: {
+      color: c.textPrimary,
+      fontSize: 13.5,
+      lineHeight: 20,
+    },
+    msgTextUser: {
+      color: c.onAccent,
+      fontWeight: '600',
+    },
+    timeLabel: {
+      color: c.textMuted,
+      fontSize: 10,
+      alignSelf: 'flex-end',
+      fontVariant: ['tabular-nums'],
+    },
+    timeLabelUser: {
+      color: c.mode === 'dark' ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.75)',
+    },
+    loadingRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingVertical: 6,
+    },
+    loadingText: {
+      color: c.textSecondary,
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    chipsScroll: {
+      maxHeight: 42,
+      borderTopWidth: 1,
+      borderTopColor: c.border,
+    },
+    chipsRow: {
+      paddingHorizontal: SPACING.md,
+      alignItems: 'center',
+      gap: 8,
+    },
+    chip: {
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.borderStrong,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: RADIUS.full,
+    },
+    chipText: {
+      color: c.textSecondary,
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    inputBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: 10,
+      backgroundColor: c.surfaceMuted,
+      borderTopWidth: 1,
+      borderTopColor: c.border,
+    },
+    chatInput: {
+      flex: 1,
+      minHeight: 44,
+      backgroundColor: c.bg,
+      borderWidth: 1,
+      borderColor: c.borderStrong,
+      borderRadius: RADIUS.full,
+      paddingHorizontal: 16,
+      color: c.textPrimary,
+      fontSize: 14,
+    },
+    sendBtn: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: c.emerald,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    sendBtnDisabled: {
+      opacity: 0.4,
+    },
+    pressed: {
+      opacity: 0.78,
+    },
+  });

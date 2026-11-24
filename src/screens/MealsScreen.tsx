@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -12,7 +12,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { FITTRACK_CONFIG, ZERO_STARCH_PRESETS } from '../config/fittrack';
-import { COLORS, RADIUS, SPACING, TYPO } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
+import { RADIUS, SPACING, ThemePalette, TYPO } from '../theme/tokens';
 import { MealLogEntry, MealPreset } from '../types/fittrack';
 
 interface MealsScreenProps {
@@ -32,6 +33,9 @@ export function MealsScreen({
   onAddCustom,
   onRemoveMeal,
 }: MealsScreenProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const [showCustomForm, setShowCustomForm] = useState(false);
   const [customName, setCustomName] = useState('');
   const [customKcal, setCustomKcal] = useState('');
@@ -78,11 +82,10 @@ export function MealsScreen({
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Header */}
         <View style={styles.headerRow}>
           <View>
             <Text style={styles.kicker}>0% CƠM · 0% ĐƯỜNG</Text>
-            <Text style={[TYPO.title, { color: COLORS.textPrimary }]}>Thực đơn Zero-Starch</Text>
+            <Text style={[TYPO.title, { color: colors.textPrimary }]}>Thực đơn Zero-Starch</Text>
           </View>
           <Pressable
             style={({ pressed }) => [styles.customToggle, pressed && styles.pressed]}
@@ -90,21 +93,15 @@ export function MealsScreen({
             accessibilityRole="button"
             accessibilityLabel="Mở biểu mẫu thêm món ăn tự nhập"
           >
-            <Ionicons name={showCustomForm ? 'close' : 'add'} size={18} color={COLORS.emerald} />
+            <Ionicons name={showCustomForm ? 'close' : 'add'} size={18} color={colors.emerald} />
             <Text style={styles.customToggleText}>{showCustomForm ? 'Đóng' : 'Tự nhập'}</Text>
           </Pressable>
         </View>
 
-        {/* Live Nutrition Strip */}
         <View style={styles.summaryStrip}>
           <View style={styles.summaryCol}>
             <Text style={styles.summaryLabel}>Calo đã nạp</Text>
-            <Text
-              style={[
-                styles.summaryValue,
-                { color: overHard ? COLORS.coral : COLORS.emerald },
-              ]}
-            >
+            <Text style={[styles.summaryValue, { color: overHard ? colors.coral : colors.emerald }]}>
               {totalKcal}
             </Text>
           </View>
@@ -114,7 +111,7 @@ export function MealsScreen({
             <Text
               style={[
                 styles.summaryValue,
-                { color: remaining < 0 ? COLORS.coral : COLORS.textPrimary },
+                { color: remaining < 0 ? colors.coral : colors.textPrimary },
               ]}
             >
               {remaining >= 0 ? remaining : `${remaining}`}
@@ -123,13 +120,10 @@ export function MealsScreen({
           <View style={styles.divider} />
           <View style={styles.summaryCol}>
             <Text style={styles.summaryLabel}>Đạm hôm nay</Text>
-            <Text style={[styles.summaryValue, { color: COLORS.amber }]}>
-              {totalProtein}g
-            </Text>
+            <Text style={[styles.summaryValue, { color: colors.amber }]}>{totalProtein}g</Text>
           </View>
         </View>
 
-        {/* Optional Custom Food Form */}
         {showCustomForm ? (
           <View style={styles.formCard}>
             <Text style={styles.formTitle}>Thêm món ngoài Preset</Text>
@@ -137,7 +131,7 @@ export function MealsScreen({
               value={customName}
               onChangeText={setCustomName}
               placeholder="Tên món (VD: 150g Cá hồi áp chảo)"
-              placeholderTextColor={COLORS.textMuted}
+              placeholderTextColor={colors.textMuted}
               style={styles.input}
               accessibilityLabel="Tên món ăn"
             />
@@ -146,7 +140,7 @@ export function MealsScreen({
                 value={customKcal}
                 onChangeText={setCustomKcal}
                 placeholder="Kcal (VD: 280)"
-                placeholderTextColor={COLORS.textMuted}
+                placeholderTextColor={colors.textMuted}
                 keyboardType="numeric"
                 style={[styles.input, styles.flex]}
                 accessibilityLabel="Số kilocalo"
@@ -155,7 +149,7 @@ export function MealsScreen({
                 value={customProtein}
                 onChangeText={setCustomProtein}
                 placeholder="Đạm g (VD: 32)"
-                placeholderTextColor={COLORS.textMuted}
+                placeholderTextColor={colors.textMuted}
                 keyboardType="numeric"
                 style={[styles.input, styles.flex]}
                 accessibilityLabel="Số gam đạm"
@@ -172,9 +166,8 @@ export function MealsScreen({
           </View>
         ) : null}
 
-        {/* Zero-Starch Presets */}
         <View style={styles.sectionHeader}>
-          <Text style={[TYPO.sectionTitle, { color: COLORS.textPrimary }]}>
+          <Text style={[TYPO.sectionTitle, { color: colors.textPrimary }]}>
             Bộ Preset chuẩn (1 chạm)
           </Text>
           <Text style={styles.sectionHint}>Tổng 6 món: 1.310 kcal · 143g đạm</Text>
@@ -190,11 +183,11 @@ export function MealsScreen({
                 </View>
                 <Text style={styles.presetName}>{preset.name}</Text>
                 <Text style={styles.presetMacros}>
-                  <Text style={{ color: COLORS.emerald, fontWeight: '700' }}>
+                  <Text style={{ color: colors.emerald, fontWeight: '700' }}>
                     {preset.kcal} kcal
                   </Text>
                   {'  ·  '}
-                  <Text style={{ color: COLORS.amber, fontWeight: '700' }}>
+                  <Text style={{ color: colors.amber, fontWeight: '700' }}>
                     {preset.protein}g đạm
                   </Text>
                 </Text>
@@ -207,22 +200,21 @@ export function MealsScreen({
                 accessibilityRole="button"
                 accessibilityLabel={`Thêm ${preset.name}`}
               >
-                <Ionicons name="add" size={22} color={COLORS.black} />
+                <Ionicons name="add" size={22} color={colors.onAccent} />
               </Pressable>
             </View>
           ))}
         </View>
 
-        {/* Today's Meal Log */}
         <View style={styles.sectionHeader}>
-          <Text style={[TYPO.sectionTitle, { color: COLORS.textPrimary }]}>
+          <Text style={[TYPO.sectionTitle, { color: colors.textPrimary }]}>
             Nhật ký hôm nay ({meals.length})
           </Text>
         </View>
 
         {meals.length === 0 ? (
           <View style={styles.emptyCard}>
-            <Ionicons name="restaurant-outline" size={24} color={COLORS.textMuted} />
+            <Ionicons name="restaurant-outline" size={24} color={colors.textMuted} />
             <Text style={styles.emptyText}>
               Chưa ghi nhận bữa nào hôm nay. Chạm dấu + ở Preset bên trên để nạp nhanh.
             </Text>
@@ -249,7 +241,7 @@ export function MealsScreen({
                   accessibilityRole="button"
                   accessibilityLabel={`Xóa ${entry.name}`}
                 >
-                  <Ionicons name="trash-outline" size={18} color={COLORS.textMuted} />
+                  <Ionicons name="trash-outline" size={18} color={colors.textMuted} />
                 </Pressable>
               </View>
             ))}
@@ -260,224 +252,225 @@ export function MealsScreen({
   );
 }
 
-const styles = StyleSheet.create({
-  flex: { flex: 1 },
-  content: {
-    padding: SPACING.md,
-    paddingBottom: 36,
-    gap: SPACING.md,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  kicker: {
-    color: COLORS.textMuted,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.9,
-  },
-  customToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: RADIUS.full,
-    backgroundColor: COLORS.emeraldDim,
-    borderWidth: 1,
-    borderColor: COLORS.emeraldBorder,
-  },
-  customToggleText: {
-    color: COLORS.emerald,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  summaryStrip: {
-    flexDirection: 'row',
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    paddingVertical: 14,
-    paddingHorizontal: SPACING.sm,
-    alignItems: 'center',
-  },
-  summaryCol: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 2,
-  },
-  summaryLabel: {
-    color: COLORS.textMuted,
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  summaryValue: {
-    fontSize: 20,
-    fontWeight: '800',
-    fontVariant: ['tabular-nums'],
-  },
-  divider: {
-    width: 1,
-    height: 28,
-    backgroundColor: COLORS.border,
-  },
-  formCard: {
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: COLORS.emeraldBorder,
-    padding: SPACING.md,
-    gap: SPACING.sm,
-  },
-  formTitle: {
-    color: COLORS.textPrimary,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  formRow: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-  },
-  input: {
-    height: 44,
-    backgroundColor: COLORS.bg,
-    borderWidth: 1,
-    borderColor: COLORS.borderStrong,
-    borderRadius: RADIUS.sm,
-    paddingHorizontal: 12,
-    color: COLORS.textPrimary,
-    fontSize: 14,
-  },
-  submitBtn: {
-    height: 44,
-    borderRadius: RADIUS.sm,
-    backgroundColor: COLORS.emerald,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  submitBtnText: {
-    color: COLORS.black,
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-  },
-  sectionHint: {
-    color: COLORS.textMuted,
-    fontSize: 11,
-    fontWeight: '600',
-    fontVariant: ['tabular-nums'],
-  },
-  listGap: {
-    gap: SPACING.sm,
-  },
-  presetCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    padding: 14,
-  },
-  presetMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
-  },
-  slotTag: {
-    color: COLORS.cyan,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  catTag: {
-    color: COLORS.textMuted,
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  presetName: {
-    color: COLORS.textPrimary,
-    fontSize: 14,
-    fontWeight: '600',
-    lineHeight: 20,
-  },
-  presetMacros: {
-    color: COLORS.textSecondary,
-    fontSize: 12,
-    marginTop: 4,
-    fontVariant: ['tabular-nums'],
-  },
-  addCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: COLORS.emerald,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyCard: {
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    padding: SPACING.lg,
-    alignItems: 'center',
-    gap: 8,
-  },
-  emptyText: {
-    color: COLORS.textSecondary,
-    fontSize: 13,
-    textAlign: 'center',
-    lineHeight: 19,
-  },
-  logRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    padding: 12,
-  },
-  timeBadge: {
-    backgroundColor: COLORS.surfaceElevated,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: RADIUS.sm,
-  },
-  timeBadgeText: {
-    color: COLORS.textSecondary,
-    fontSize: 11,
-    fontWeight: '700',
-    fontVariant: ['tabular-nums'],
-  },
-  logName: {
-    color: COLORS.textPrimary,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  logMacros: {
-    color: COLORS.textMuted,
-    fontSize: 12,
-    marginTop: 2,
-    fontVariant: ['tabular-nums'],
-  },
-  deleteBtn: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pressed: {
-    opacity: 0.78,
-  },
-});
+const createStyles = (c: ThemePalette) =>
+  StyleSheet.create({
+    flex: { flex: 1 },
+    content: {
+      padding: SPACING.md,
+      paddingBottom: 28,
+      gap: SPACING.md,
+    },
+    headerRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    kicker: {
+      color: c.textMuted,
+      fontSize: 11,
+      fontWeight: '700',
+      letterSpacing: 0.9,
+    },
+    customToggle: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: RADIUS.full,
+      backgroundColor: c.emeraldDim,
+      borderWidth: 1,
+      borderColor: c.emeraldBorder,
+    },
+    customToggleText: {
+      color: c.emerald,
+      fontSize: 12,
+      fontWeight: '700',
+    },
+    summaryStrip: {
+      flexDirection: 'row',
+      backgroundColor: c.surface,
+      borderRadius: RADIUS.lg,
+      borderWidth: 1,
+      borderColor: c.border,
+      paddingVertical: 14,
+      paddingHorizontal: SPACING.sm,
+      alignItems: 'center',
+    },
+    summaryCol: {
+      flex: 1,
+      alignItems: 'center',
+      gap: 2,
+    },
+    summaryLabel: {
+      color: c.textMuted,
+      fontSize: 11,
+      fontWeight: '600',
+    },
+    summaryValue: {
+      fontSize: 20,
+      fontWeight: '800',
+      fontVariant: ['tabular-nums'],
+    },
+    divider: {
+      width: 1,
+      height: 28,
+      backgroundColor: c.border,
+    },
+    formCard: {
+      backgroundColor: c.surface,
+      borderRadius: RADIUS.lg,
+      borderWidth: 1,
+      borderColor: c.emeraldBorder,
+      padding: SPACING.md,
+      gap: SPACING.sm,
+    },
+    formTitle: {
+      color: c.textPrimary,
+      fontSize: 14,
+      fontWeight: '700',
+    },
+    formRow: {
+      flexDirection: 'row',
+      gap: SPACING.sm,
+    },
+    input: {
+      height: 44,
+      backgroundColor: c.bg,
+      borderWidth: 1,
+      borderColor: c.borderStrong,
+      borderRadius: RADIUS.sm,
+      paddingHorizontal: 12,
+      color: c.textPrimary,
+      fontSize: 14,
+    },
+    submitBtn: {
+      height: 44,
+      borderRadius: RADIUS.sm,
+      backgroundColor: c.emerald,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    submitBtnText: {
+      color: c.onAccent,
+      fontSize: 14,
+      fontWeight: '800',
+    },
+    sectionHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'baseline',
+    },
+    sectionHint: {
+      color: c.textMuted,
+      fontSize: 11,
+      fontWeight: '600',
+      fontVariant: ['tabular-nums'],
+    },
+    listGap: {
+      gap: SPACING.sm,
+    },
+    presetCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      backgroundColor: c.surface,
+      borderRadius: RADIUS.md,
+      borderWidth: 1,
+      borderColor: c.border,
+      padding: 14,
+    },
+    presetMetaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 4,
+    },
+    slotTag: {
+      color: c.cyan,
+      fontSize: 11,
+      fontWeight: '700',
+    },
+    catTag: {
+      color: c.textMuted,
+      fontSize: 11,
+      fontWeight: '600',
+    },
+    presetName: {
+      color: c.textPrimary,
+      fontSize: 14,
+      fontWeight: '600',
+      lineHeight: 20,
+    },
+    presetMacros: {
+      color: c.textSecondary,
+      fontSize: 12,
+      marginTop: 4,
+      fontVariant: ['tabular-nums'],
+    },
+    addCircle: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: c.emerald,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    emptyCard: {
+      backgroundColor: c.surface,
+      borderRadius: RADIUS.md,
+      borderWidth: 1,
+      borderColor: c.border,
+      padding: SPACING.lg,
+      alignItems: 'center',
+      gap: 8,
+    },
+    emptyText: {
+      color: c.textSecondary,
+      fontSize: 13,
+      textAlign: 'center',
+      lineHeight: 19,
+    },
+    logRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      backgroundColor: c.surface,
+      borderRadius: RADIUS.md,
+      borderWidth: 1,
+      borderColor: c.border,
+      padding: 12,
+    },
+    timeBadge: {
+      backgroundColor: c.surfaceElevated,
+      paddingHorizontal: 8,
+      paddingVertical: 5,
+      borderRadius: RADIUS.sm,
+    },
+    timeBadgeText: {
+      color: c.textSecondary,
+      fontSize: 11,
+      fontWeight: '700',
+      fontVariant: ['tabular-nums'],
+    },
+    logName: {
+      color: c.textPrimary,
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    logMacros: {
+      color: c.textMuted,
+      fontSize: 12,
+      marginTop: 2,
+      fontVariant: ['tabular-nums'],
+    },
+    deleteBtn: {
+      width: 36,
+      height: 36,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    pressed: {
+      opacity: 0.78,
+    },
+  });

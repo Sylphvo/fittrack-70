@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -19,7 +19,8 @@ import { RoadmapScreen } from './src/screens/RoadmapScreen';
 import { TodayScreen } from './src/screens/TodayScreen';
 import { WorkoutScreen } from './src/screens/WorkoutScreen';
 import { useFitTrackStore } from './src/store/useFitTrackStore';
-import { COLORS, SPACING } from './src/theme/tokens';
+import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
+import { SPACING, ThemePalette } from './src/theme/tokens';
 import { TabKey } from './src/types/fittrack';
 
 const TABS: {
@@ -38,27 +39,32 @@ const TABS: {
 function MainApp() {
   const [activeTab, setActiveTab] = useState<TabKey>('today');
   const store = useFitTrackStore();
+  const { colors, mode } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const handleSelectTab = useCallback((tab: TabKey) => {
     Haptics.selectionAsync().catch(() => {});
     setActiveTab(tab);
   }, []);
 
+  const Container = Platform.OS === 'web' ? View : SafeAreaView;
+  const TabWrapper = Platform.OS === 'web' ? View : SafeAreaView;
+
   if (!store.isLoaded) {
     return (
-      <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.emerald} />
+      <Container style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.emerald} />
         <Text style={styles.loadingText}>Đang tải dữ liệu FitTrack 70...</Text>
-      </SafeAreaView>
+      </Container>
     );
   }
 
   return (
-    <SafeAreaView
+    <Container
       style={styles.container}
-      edges={Platform.OS === 'web' ? [] : ['top', 'left', 'right']}
+      {...(Platform.OS === 'web' ? {} : { edges: ['top', 'left', 'right'] as const })}
     >
-      <StatusBar style="light" backgroundColor={COLORS.bg} />
+      <StatusBar style={mode === 'dark' ? 'light' : 'dark'} backgroundColor={colors.bg} />
 
       <View style={styles.body}>
         {activeTab === 'today' ? (
@@ -119,15 +125,10 @@ function MainApp() {
         ) : null}
       </View>
 
-      {/* Bottom Tab Bar (iOS Safe Area Aware) */}
-      <SafeAreaView
-        edges={Platform.OS === 'web' ? [] : ['bottom']}
-        style={[
-          styles.tabBarSafe,
-          Platform.OS === 'web'
-            ? ({ paddingBottom: 'env(safe-area-inset-bottom, 0px)' } as object)
-            : null,
-        ]}
+      {/* Bottom Tab Bar */}
+      <TabWrapper
+        style={styles.tabBarSafe}
+        {...(Platform.OS === 'web' ? {} : { edges: ['bottom'] as const })}
       >
         <View style={styles.tabBar} accessibilityRole="tablist">
           {TABS.map((tab) => {
@@ -144,7 +145,7 @@ function MainApp() {
                 <Ionicons
                   name={focused ? tab.activeIcon : tab.icon}
                   size={22}
-                  color={focused ? COLORS.emerald : COLORS.textMuted}
+                  color={focused ? colors.emerald : colors.textMuted}
                 />
                 <Text style={[styles.tabLabel, focused && styles.tabLabelActive]}>
                   {tab.label}
@@ -153,95 +154,106 @@ function MainApp() {
             );
           })}
         </View>
-      </SafeAreaView>
-    </SafeAreaView>
+      </TabWrapper>
+    </Container>
   );
 }
 
-export default function App() {
+function AppShell() {
   const { width } = useWindowDimensions();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const isDesktopWeb = Platform.OS === 'web' && width > 520;
 
+  if (isDesktopWeb) {
+    return (
+      <View style={styles.webBackdrop}>
+        <View style={styles.webPhoneFrame}>
+          <MainApp />
+        </View>
+      </View>
+    );
+  }
+  return <MainApp />;
+}
+
+export default function App() {
   return (
     <SafeAreaProvider>
-      <ErrorBoundary>
-        {isDesktopWeb ? (
-          <View style={styles.webBackdrop}>
-            <View style={styles.webPhoneFrame}>
-              <MainApp />
-            </View>
-          </View>
-        ) : (
-          <MainApp />
-        )}
-      </ErrorBoundary>
+      <ThemeProvider>
+        <ErrorBoundary>
+          <AppShell />
+        </ErrorBoundary>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
 
-const styles = StyleSheet.create({
-  webBackdrop: {
-    flex: 1,
-    backgroundColor: '#040608',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  webPhoneFrame: {
-    flex: 1,
-    width: '100%',
-    maxWidth: 430,
-    maxHeight: 900,
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderColor: COLORS.border,
-    overflow: 'hidden',
-  },
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.bg,
-  },
-  body: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: COLORS.bg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.sm,
-  },
-  loadingText: {
-    color: COLORS.textSecondary,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  tabBarSafe: {
-    backgroundColor: COLORS.surface,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-  },
-  tabBar: {
-    flexDirection: 'row',
-    height: 58,
-    paddingHorizontal: 6,
-  },
-  tabItem: {
-    flex: 1,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 3,
-  },
-  tabPressed: {
-    opacity: 0.7,
-  },
-  tabLabel: {
-    color: COLORS.textMuted,
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  tabLabelActive: {
-    color: COLORS.emerald,
-    fontWeight: '700',
-  },
-});
+const createStyles = (c: ThemePalette) =>
+  StyleSheet.create({
+    webBackdrop: {
+      flex: 1,
+      backgroundColor: c.mode === 'dark' ? '#040608' : '#E2E8F0',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    webPhoneFrame: {
+      flex: 1,
+      width: '100%',
+      maxWidth: 430,
+      maxHeight: 900,
+      borderLeftWidth: 1,
+      borderRightWidth: 1,
+      borderColor: c.border,
+      overflow: 'hidden',
+    },
+    container: {
+      flex: 1,
+      backgroundColor: c.bg,
+    },
+    body: {
+      flex: 1,
+      overflow: 'hidden',
+    },
+    loadingContainer: {
+      flex: 1,
+      backgroundColor: c.bg,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: SPACING.sm,
+    },
+    loadingText: {
+      color: c.textSecondary,
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    tabBarSafe: {
+      backgroundColor: c.surface,
+      borderTopWidth: 1,
+      borderTopColor: c.border,
+    },
+    tabBar: {
+      flexDirection: 'row',
+      height: 58,
+      paddingHorizontal: 6,
+    },
+    tabItem: {
+      flex: 1,
+      minHeight: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 3,
+    },
+    tabPressed: {
+      opacity: 0.7,
+    },
+    tabLabel: {
+      color: c.textMuted,
+      fontSize: 11,
+      fontWeight: '600',
+    },
+    tabLabelActive: {
+      color: c.emerald,
+      fontWeight: '700',
+    },
+  });
