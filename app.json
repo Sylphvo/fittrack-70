@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "FitTrack70",
+    "slug": "fittrack-70",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": false,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#090B0E"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.fuxhealthy.fittrack70",
+      "buildNumber": "1",
+      "infoPlist": {
+        "CFBundleDisplayName": "FitTrack 70",
+        "UIStatusBarStyle": "UIStatusBarStyleLightContent",
+        "UIViewControllerBasedStatusBarAppearance": false,
+        "NSCameraUsageDescription": "FitTrack 70 cần quyền Camera để chụp ảnh món ăn và ước tính lượng calo, đạm.",
+        "NSPhotoLibraryUsageDescription": "FitTrack 70 cần quyền Thư viện ảnh để chọn ảnh món ăn và phân tích dinh dưỡng."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#090B0E"
+      },
+      "package": "com.fuxhealthy.fittrack70"
+    }
+  }
+}

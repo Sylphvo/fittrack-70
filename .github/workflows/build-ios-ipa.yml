@@ -1,0 +1,51 @@
+name: Build Unsigned iOS IPA for iPaside
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-ipa:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Generate iOS Native Project (Expo Prebuild)
+        env:
+          EXPO_NO_TELEMETRY: "1"
+        run: npx expo prebuild --platform ios --clean
+
+      - name: Build Unsigned Archive & Package IPA
+        run: |
+          set -e
+          cd ios
+          xcodebuild -workspace FitTrack70.xcworkspace \
+            -scheme FitTrack70 \
+            -configuration Release \
+            -sdk iphoneos \
+            -archivePath build/FitTrack70.xcarchive \
+            archive \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            DEVELOPMENT_TEAM=""
+
+          mkdir -p build/Payload
+          cp -r build/FitTrack70.xcarchive/Products/Applications/*.app build/Payload/
+          cd build
+          zip -r FitTrack70_unsigned.ipa Payload
+          ls -lh FitTrack70_unsigned.ipa
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FitTrack70-IPA
+          path: ios/build/FitTrack70_unsigned.ipa
