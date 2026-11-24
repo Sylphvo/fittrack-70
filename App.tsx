@@ -54,7 +54,10 @@ function MainApp() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView
+      style={styles.container}
+      edges={Platform.OS === 'web' ? [] : ['top', 'left', 'right']}
+    >
       <StatusBar style="light" backgroundColor={COLORS.bg} />
 
       <View style={styles.body}>
@@ -117,7 +120,15 @@ function MainApp() {
       </View>
 
       {/* Bottom Tab Bar (iOS Safe Area Aware) */}
-      <SafeAreaView edges={['bottom']} style={styles.tabBarSafe}>
+      <SafeAreaView
+        edges={Platform.OS === 'web' ? [] : ['bottom']}
+        style={[
+          styles.tabBarSafe,
+          Platform.OS === 'web'
+            ? ({ paddingBottom: 'env(safe-area-inset-bottom, 0px)' } as object)
+            : null,
+        ]}
+      >
         <View style={styles.tabBar} accessibilityRole="tablist">
           {TABS.map((tab) => {
             const focused = activeTab === tab.key;

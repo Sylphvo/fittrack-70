@@ -70,14 +70,28 @@ const pwaHead = `
     <link rel="apple-touch-icon" href="${BASE_PATH}/apple-touch-icon.png" />
     <link rel="manifest" href="${BASE_PATH}/manifest.json" />
     <style>
-      html, body, #root {
+      *, *::before, *::after {
+        box-sizing: border-box;
+      }
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
         background-color: #090B0E !important;
-        overscroll-behavior-y: none;
+        overscroll-behavior: none;
         -webkit-tap-highlight-color: transparent;
       }
-      body {
-        padding-top: env(safe-area-inset-top);
-        padding-bottom: env(safe-area-inset-bottom);
+      #root {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        background-color: #090B0E !important;
+        padding-top: env(safe-area-inset-top, 0px);
       }
     </style>
 `;
