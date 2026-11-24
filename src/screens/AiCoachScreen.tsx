@@ -121,13 +121,56 @@ export function AiCoachScreen({ context, onAddMeal }: AiCoachScreenProps) {
     }
   };
 
+  const pickWebFile = (useCamera: boolean): Promise<{ uri: string; base64: string; mimeType: string } | null> => {
+    return new Promise((resolve) => {
+      if (typeof document === 'undefined') {
+        resolve(null);
+        return;
+      }
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.accept = 'image/*';
+      if (useCamera) {
+        fileInput.setAttribute('capture', 'environment');
+      }
+      fileInput.onchange = () => {
+        const file = fileInput.files?.[0];
+        if (!file) {
+          resolve(null);
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+          const dataUrl = String(reader.result || '');
+          const commaIdx = dataUrl.indexOf(',');
+          const base64 = commaIdx >= 0 ? dataUrl.slice(commaIdx + 1) : '';
+          resolve({
+            uri: dataUrl,
+            base64,
+            mimeType: file.type || 'image/jpeg',
+          });
+        };
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(file);
+      };
+      fileInput.click();
+    });
+  };
+
   const handlePickImage = async (source: 'camera' | 'library') => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
 
     try {
+      if (Platform.OS === 'web') {
+        const picked = await pickWebFile(source === 'camera');
+        if (!picked) return;
+        await processPickedImage(picked.uri, picked.base64, picked.mimeType);
+        return;
+      }
+
       let result: ImagePicker.ImagePickerResult;
 
-      if (source === 'camera' && Platform.OS !== 'web') {
+      if (source === 'camera') {
         const perm = await ImagePicker.requestCameraPermissionsAsync();
         if (!perm.granted) {
           Alert.alert(
@@ -143,15 +186,13 @@ export function AiCoachScreen({ context, onAddMeal }: AiCoachScreenProps) {
           base64: true,
         });
       } else {
-        if (Platform.OS !== 'web') {
-          const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-          if (!perm.granted) {
-            Alert.alert(
-              'Cần quyền Thư viện ảnh',
-              'Vui lòng cấp quyền Thư viện ảnh để chọn ảnh món ăn.'
-            );
-            return;
-          }
+        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!perm.granted) {
+          Alert.alert(
+            'Cần quyền Thư viện ảnh',
+            'Vui lòng cấp quyền Thư viện ảnh để chọn ảnh món ăn.'
+          );
+          return;
         }
         result = await ImagePicker.launchImageLibraryAsync({
           mediaTypes: ['images'],

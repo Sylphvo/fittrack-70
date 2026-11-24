@@ -30,6 +30,18 @@
         "backgroundColor": "#090B0E"
       },
       "package": "com.fuxhealthy.fittrack70"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/icon.png",
+      "name": "FitTrack 70",
+      "shortName": "FitTrack 70",
+      "themeColor": "#090B0E",
+      "backgroundColor": "#090B0E"
+    },
+    "experiments": {
+      "baseUrl": "/fittrack-70"
     }
   }
 }

@@ -1,5 +1,13 @@
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -140,10 +148,13 @@ function MainApp() {
 }
 
 export default function App() {
+  const { width } = useWindowDimensions();
+  const isDesktopWeb = Platform.OS === 'web' && width > 520;
+
   return (
     <SafeAreaProvider>
       <ErrorBoundary>
-        {Platform.OS === 'web' ? (
+        {isDesktopWeb ? (
           <View style={styles.webBackdrop}>
             <View style={styles.webPhoneFrame}>
               <MainApp />
