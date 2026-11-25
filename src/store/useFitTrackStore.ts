@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { FITTRACK_CONFIG, ZERO_STARCH_PRESETS } from '../config/fittrack';
-import { DailyRecord, FitTrackState, MealLogEntry, MealPreset } from '../types/fittrack';
+import { FITTRACK_CONFIG, SEEDED_DAILY_LOGS, ZERO_STARCH_PRESETS } from '../config/fittrack';
+import {
+  CustomWorkoutLog,
+  DailyRecord,
+  FitTrackState,
+  MealLogEntry,
+  MealPreset,
+} from '../types/fittrack';
 
 const STORAGE_KEY = '@fittrack70/state_v1';
 
@@ -25,15 +31,49 @@ function createEmptyDay(dateKey: string): DailyRecord {
     meals: [],
     waterMl: 0,
     completedWorkouts: [],
+    customWorkouts: [],
     cardioElapsedSec: 0,
     isClosedOut: false,
   };
 }
 
-const INITIAL_STATE: FitTrackState = {
+function applySeeds(base: FitTrackState): { state: FitTrackState; changed: boolean } {
+  const applied = new Set(base.appliedSeeds ?? []);
+  let changed = false;
+  let nextWeight = base.currentWeight;
+  const nextRecords = { ...base.records };
+
+  for (const seed of SEEDED_DAILY_LOGS) {
+    if (!applied.has(seed.seedId)) {
+      const existing = nextRecords[seed.record.dateKey];
+      nextRecords[seed.record.dateKey] = {
+        ...seed.record,
+        waterMl: existing?.waterMl || seed.record.waterMl,
+      };
+      if (seed.record.weightKg !== null) {
+        nextWeight = seed.record.weightKg;
+      }
+      applied.add(seed.seedId);
+      changed = true;
+    }
+  }
+
+  if (!changed) return { state: base, changed: false };
+  return {
+    state: {
+      currentWeight: nextWeight,
+      records: nextRecords,
+      appliedSeeds: Array.from(applied),
+    },
+    changed: true,
+  };
+}
+
+const INITIAL_STATE: FitTrackState = applySeeds({
   currentWeight: FITTRACK_CONFIG.START_WEIGHT,
   records: {},
-};
+  appliedSeeds: [],
+}).state;
 
 export function useFitTrackStore() {
   const [state, setState] = useState<FitTrackState>(INITIAL_STATE);
@@ -48,11 +88,17 @@ export function useFitTrackStore() {
         if (raw && mounted) {
           const parsed = JSON.parse(raw) as FitTrackState;
           if (parsed && typeof parsed.currentWeight === 'number' && parsed.records) {
-            setState(parsed);
+            const merged = applySeeds(parsed);
+            setState(merged.state);
+            if (merged.changed) {
+              AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(merged.state)).catch(() => {});
+            }
           }
+        } else if (mounted) {
+          AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_STATE)).catch(() => {});
         }
       } catch {
-        // Fallback to initial state if storage cannot be parsed
+        // Fallback to initial state
       } finally {
         if (mounted) setIsLoaded(true);
       }
@@ -80,6 +126,10 @@ export function useFitTrackStore() {
     const remainingKcal = FITTRACK_CONFIG.TARGET_KCAL - kcal;
     const isInSafeZone = kcal <= FITTRACK_CONFIG.TARGET_KCAL;
     const isOverHardCeiling = kcal > FITTRACK_CONFIG.SAFE_KCAL_MAX;
+    const totalReps = (todayRecord.customWorkouts ?? []).reduce(
+      (sum, w) => (w.done ? sum + w.reps : sum),
+      0
+    );
     return {
       kcal,
       protein,
@@ -87,6 +137,7 @@ export function useFitTrackStore() {
       remainingKcal,
       isInSafeZone,
       isOverHardCeiling,
+      totalReps,
     };
   }, [todayRecord]);
 
@@ -97,6 +148,7 @@ export function useFitTrackStore() {
       persist((prev) => {
         const current = prev.records[todayKey] ?? createEmptyDay(todayKey);
         return {
+          ...prev,
           currentWeight: rounded,
           records: {
             ...prev.records,
@@ -244,6 +296,25 @@ export function useFitTrackStore() {
     [persist, todayKey]
   );
 
+  const toggleCustomWorkout = useCallback(
+    (workoutId: string) => {
+      persist((prev) => {
+        const current = prev.records[todayKey] ?? createEmptyDay(todayKey);
+        const nextCustom = (current.customWorkouts ?? []).map((w) =>
+          w.id === workoutId ? { ...w, done: !w.done } : w
+        );
+        return {
+          ...prev,
+          records: {
+            ...prev.records,
+            [todayKey]: { ...current, customWorkouts: nextCustom },
+          },
+        };
+      });
+    },
+    [persist, todayKey]
+  );
+
   const setCardioElapsed = useCallback(
     (seconds: number) => {
       persist((prev) => {
@@ -287,6 +358,75 @@ export function useFitTrackStore() {
     });
   }, [persist, todayKey]);
 
+  const importDailyJson = useCallback(
+    (rawJson: string): { ok: boolean; message: string } => {
+      try {
+        const parsed = JSON.parse(rawJson.trim());
+        const dateKey =
+          typeof parsed.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(parsed.date)
+            ? parsed.date
+            : todayKey;
+        const parsedWeight =
+          parsed.weight !== undefined && parsed.weight !== null
+            ? parseFloat(String(parsed.weight).replace(',', '.'))
+            : null;
+        const validWeight =
+          parsedWeight !== null && Number.isFinite(parsedWeight) && parsedWeight >= 40 && parsedWeight <= 200
+            ? Math.round(parsedWeight * 10) / 10
+            : null;
+
+        const ts = getTimeStamp();
+        const meals: MealLogEntry[] = Array.isArray(parsed.foods)
+          ? parsed.foods.map((f: { name?: string; kcal?: number; protein?: number }, idx: number) => ({
+              id: `imp-${Date.now()}-${idx}`,
+              name: String(f.name || 'Món ăn'),
+              kcal: Math.max(0, Math.round(Number(f.kcal) || 0)),
+              protein: Math.max(0, Math.round(Number(f.protein) || 0)),
+              timestamp: ts,
+            }))
+          : [];
+
+        const customWorkouts: CustomWorkoutLog[] = Array.isArray(parsed.workouts)
+          ? parsed.workouts.map(
+              (w: { title?: string; reps?: number; done?: boolean }, idx: number) => ({
+                id: `imp-w-${Date.now()}-${idx}`,
+                title: String(w.title || 'Bài tập'),
+                reps: Math.max(0, Math.round(Number(w.reps) || 0)),
+                done: w.done !== false,
+              })
+            )
+          : [];
+
+        persist((prev) => {
+          const existing = prev.records[dateKey] ?? createEmptyDay(dateKey);
+          return {
+            ...prev,
+            currentWeight: validWeight ?? prev.currentWeight,
+            records: {
+              ...prev.records,
+              [dateKey]: {
+                ...existing,
+                dateKey,
+                weightKg: validWeight ?? existing.weightKg,
+                meals: meals.length > 0 ? meals : existing.meals,
+                customWorkouts:
+                  customWorkouts.length > 0 ? customWorkouts : existing.customWorkouts,
+              },
+            },
+          };
+        });
+
+        return {
+          ok: true,
+          message: `Đã cập nhật ngày ${dateKey} (${meals.length} món, ${customWorkouts.length} bài tập).`,
+        };
+      } catch {
+        return { ok: false, message: 'JSON không hợp lệ. Vui lòng kiểm tra lại định dạng.' };
+      }
+    },
+    [persist, todayKey]
+  );
+
   const historyList = useMemo(() => {
     return Object.values(state.records).sort((a, b) => b.dateKey.localeCompare(a.dateKey));
   }, [state.records]);
@@ -326,7 +466,9 @@ export function useFitTrackStore() {
     removeMeal,
     adjustWater,
     toggleWorkout,
+    toggleCustomWorkout,
     setCardioElapsed,
     toggleCloseOutDay,
+    importDailyJson,
   };
 }

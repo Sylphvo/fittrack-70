@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { WeightChart } from '../components/WeightChart';
@@ -12,15 +12,29 @@ interface RoadmapScreenProps {
   currentWeight: number;
   weightHistory: { dateKey: string; weightKg: number }[];
   historyList: DailyRecord[];
+  onImportJson: (rawJson: string) => { ok: boolean; message: string };
 }
 
 export function RoadmapScreen({
   currentWeight,
   weightHistory,
   historyList,
+  onImportJson,
 }: RoadmapScreenProps) {
   const { colors, mode, toggleTheme } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const [showImport, setShowImport] = useState(false);
+  const [jsonText, setJsonText] = useState('');
+  const [importStatus, setImportStatus] = useState<{ ok: boolean; message: string } | null>(null);
+
+  const handleImportSubmit = () => {
+    const res = onImportJson(jsonText);
+    setImportStatus(res);
+    if (res.ok) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      setJsonText('');
+    }
+  };
 
   const totalToLose = FITTRACK_CONFIG.START_WEIGHT - FITTRACK_CONFIG.TARGET_WEIGHT;
   const lostSoFar = Math.max(0, FITTRACK_CONFIG.START_WEIGHT - currentWeight);
@@ -43,20 +57,68 @@ export function RoadmapScreen({
           <Text style={styles.kicker}>LỘ TRÌNH 88.0 KG → 70.0 KG</Text>
           <Text style={[TYPO.title, { color: colors.textPrimary }]}>Tiến độ & Kỷ lục</Text>
         </View>
-        <Pressable
-          style={({ pressed }) => [styles.themePill, pressed && styles.pressed]}
-          onPress={handleToggleTheme}
-          accessibilityRole="button"
-          accessibilityLabel="Đổi giao diện sáng tối"
-        >
-          <Ionicons
-            name={mode === 'dark' ? 'sunny-outline' : 'moon-outline'}
-            size={15}
-            color={mode === 'dark' ? colors.amber : colors.textPrimary}
-          />
-          <Text style={styles.themePillText}>{mode === 'dark' ? 'Nền sáng' : 'Nền tối'}</Text>
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable
+            style={({ pressed }) => [styles.themePill, pressed && styles.pressed]}
+            onPress={() => setShowImport((v) => !v)}
+            accessibilityRole="button"
+            accessibilityLabel="Nhập dữ liệu JSON ngày"
+          >
+            <Ionicons name="code-download-outline" size={15} color={colors.emerald} />
+            <Text style={styles.themePillText}>JSON</Text>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.themePill, pressed && styles.pressed]}
+            onPress={handleToggleTheme}
+            accessibilityRole="button"
+            accessibilityLabel="Đổi giao diện sáng tối"
+          >
+            <Ionicons
+              name={mode === 'dark' ? 'sunny-outline' : 'moon-outline'}
+              size={15}
+              color={mode === 'dark' ? colors.amber : colors.textPrimary}
+            />
+            <Text style={styles.themePillText}>{mode === 'dark' ? 'Sáng' : 'Tối'}</Text>
+          </Pressable>
+        </View>
       </View>
+
+      {showImport ? (
+        <View style={styles.specCard}>
+          <Text style={[TYPO.sectionTitle, { color: colors.textPrimary }]}>
+            Nhập nhanh dữ liệu JSON trong ngày
+          </Text>
+          <TextInput
+            value={jsonText}
+            onChangeText={setJsonText}
+            multiline
+            numberOfLines={4}
+            placeholder='Dán JSON {"date":"2026-11-25","weight":"88.0","foods":[...],"workouts":[...]}'
+            placeholderTextColor={colors.textMuted}
+            style={styles.jsonInput}
+            accessibilityLabel="Dán dữ liệu JSON"
+          />
+          {importStatus ? (
+            <Text
+              style={{
+                color: importStatus.ok ? colors.emerald : colors.coral,
+                fontSize: 12,
+                fontWeight: '600',
+              }}
+            >
+              {importStatus.message}
+            </Text>
+          ) : null}
+          <Pressable
+            style={({ pressed }) => [styles.importBtn, pressed && styles.pressed]}
+            onPress={handleImportSubmit}
+            accessibilityRole="button"
+            accessibilityLabel="Cập nhật dữ liệu từ JSON"
+          >
+            <Text style={styles.importBtnText}>Cập nhật vào app</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       <View style={styles.heroCard}>
         <View style={styles.heroTop}>
@@ -184,6 +246,9 @@ export function RoadmapScreen({
                   <Text style={styles.historyDot}>·</Text>
                   <Text style={styles.historyMetric}>
                     Tập {day.completedWorkouts.length}/{EVENING_WORKOUT_PLAN.length}
+                    {(day.customWorkouts?.length ?? 0) > 0
+                      ? ` (${day.customWorkouts!.reduce((s, w) => (w.done ? s + w.reps : s), 0)} reps)`
+                      : ''}
                   </Text>
                   {day.weightKg !== null ? (
                     <>
@@ -213,6 +278,34 @@ const createStyles = (c: ThemePalette) =>
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
+    },
+    headerActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    jsonInput: {
+      minHeight: 88,
+      backgroundColor: c.bg,
+      borderWidth: 1,
+      borderColor: c.borderStrong,
+      borderRadius: RADIUS.sm,
+      padding: 10,
+      color: c.textPrimary,
+      fontSize: 12,
+      textAlignVertical: 'top',
+    },
+    importBtn: {
+      height: 42,
+      borderRadius: RADIUS.sm,
+      backgroundColor: c.emerald,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    importBtnText: {
+      color: c.onAccent,
+      fontSize: 13,
+      fontWeight: '800',
     },
     themePill: {
       flexDirection: 'row',

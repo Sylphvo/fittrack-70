@@ -1,4 +1,4 @@
-import { MealPreset, WorkoutItem } from '../types/fittrack';
+import { DailyRecord, MealPreset, WorkoutItem } from '../types/fittrack';
 
 export const FITTRACK_CONFIG = {
   APP_NAME: 'FitTrack 70',
@@ -102,3 +102,30 @@ export const DAILY_ROUTINE_STEPS = [
   { id: 'rt-workout', time: '18:15', label: 'Hoàn thành buổi tập 18h15–19h15' },
   { id: 'rt-closeout', time: '22:00', label: 'Kiểm tra Calo ≤ 1.450 & Chốt ngày' },
 ] as const;
+
+export const SEEDED_DAILY_LOGS: { seedId: string; record: DailyRecord }[] = [
+  {
+    seedId: 'seed-2026-11-25-v1',
+    record: {
+      dateKey: '2026-11-25',
+      weightKg: 88.0,
+      waterMl: 0,
+      completedWorkouts: ['wk-wall-crunch'],
+      cardioElapsedSec: 0,
+      isClosedOut: false,
+      meals: [
+        { id: 'seed-20261125-f6', name: 'Ham gà chay (7 miếng)', kcal: 190, protein: 14, timestamp: '19:30' },
+        { id: 'seed-20261125-f5', name: 'Trứng gà luộc (4 quả)', kcal: 300, protein: 24, timestamp: '19:30' },
+        { id: 'seed-20261125-f4', name: 'Trứng gà tiềm (2 quả)', kcal: 147, protein: 13, timestamp: '15:30' },
+        { id: 'seed-20261125-f3', name: 'Cơm nắm thịt nướng phô mai X2 (113g)', kcal: 209, protein: 6, timestamp: '12:15' },
+        { id: 'seed-20261125-f2', name: 'Set Sushi Ngũ Phúc (141g)', kcal: 213, protein: 7, timestamp: '12:00' },
+        { id: 'seed-20261125-f1', name: 'Cà phê sữa KODOCHI (100ml)', kcal: 135, protein: 2, timestamp: '08:00' },
+      ],
+      customWorkouts: [
+        { id: 'seed-20261125-w1', title: 'Plank cưa người (Body Saw)', reps: 20, done: true },
+        { id: 'seed-20261125-w2', title: 'Gập bụng trên tường (Cơ bụng trên)', reps: 50, done: true },
+        { id: 'seed-20261125-w3', title: 'Gập bụng chéo trên tường (Cơ bụng bên)', reps: 30, done: true },
+      ],
+    },
+  },
+];

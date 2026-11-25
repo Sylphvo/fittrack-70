@@ -110,8 +110,10 @@ function MainApp() {
         {activeTab === 'workout' ? (
           <WorkoutScreen
             completedWorkouts={store.todayRecord.completedWorkouts}
+            customWorkouts={store.todayRecord.customWorkouts ?? []}
             cardioElapsedSec={store.todayRecord.cardioElapsedSec}
             onToggleWorkout={store.toggleWorkout}
+            onToggleCustomWorkout={store.toggleCustomWorkout}
             onUpdateCardioElapsed={store.setCardioElapsed}
           />
         ) : null}
@@ -121,6 +123,7 @@ function MainApp() {
             currentWeight={store.currentWeight}
             weightHistory={store.weightHistory}
             historyList={store.historyList}
+            onImportJson={store.importDailyJson}
           />
         ) : null}
       </View>

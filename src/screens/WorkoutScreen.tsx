@@ -5,11 +5,14 @@ import * as Haptics from 'expo-haptics';
 import { EVENING_WORKOUT_PLAN, FITTRACK_CONFIG } from '../config/fittrack';
 import { useTheme } from '../theme/ThemeContext';
 import { RADIUS, SPACING, ThemePalette, TYPO } from '../theme/tokens';
+import { CustomWorkoutLog } from '../types/fittrack';
 
 interface WorkoutScreenProps {
   completedWorkouts: string[];
+  customWorkouts: CustomWorkoutLog[];
   cardioElapsedSec: number;
   onToggleWorkout: (workoutId: string) => void;
+  onToggleCustomWorkout: (workoutId: string) => void;
   onUpdateCardioElapsed: (seconds: number) => void;
 }
 
@@ -22,8 +25,10 @@ function formatClock(totalSeconds: number): string {
 
 export function WorkoutScreen({
   completedWorkouts,
+  customWorkouts,
   cardioElapsedSec,
   onToggleWorkout,
+  onToggleCustomWorkout,
   onUpdateCardioElapsed,
 }: WorkoutScreenProps) {
   const { colors } = useTheme();
@@ -206,6 +211,59 @@ export function WorkoutScreen({
           </Pressable>
         </View>
       </View>
+
+      {/* Custom Logged Workouts (Reps) */}
+      {customWorkouts.length > 0 ? (
+        <>
+          <View style={styles.sectionHeader}>
+            <Text style={[TYPO.sectionTitle, { color: colors.textPrimary }]}>
+              Bài tập đã ghi nhận hôm nay
+            </Text>
+            <Text style={[styles.sectionHint, { color: colors.emerald }]}>
+              {customWorkouts.reduce((s, w) => (w.done ? s + w.reps : s), 0)} reps
+            </Text>
+          </View>
+          <View style={styles.listGap}>
+            {customWorkouts.map((item) => (
+              <Pressable
+                key={item.id}
+                style={({ pressed }) => [
+                  styles.workoutCard,
+                  item.done && styles.workoutCardDone,
+                  pressed && styles.pressed,
+                ]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                  onToggleCustomWorkout(item.id);
+                }}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: item.done }}
+                accessibilityLabel={`${item.title} ${item.reps} reps`}
+              >
+                <View style={styles.timeCol}>
+                  <Text style={[styles.timeText, item.done && { color: colors.emerald }]}>
+                    {item.reps}
+                  </Text>
+                  <Text style={styles.durationText}>reps</Text>
+                </View>
+                <View style={styles.flex}>
+                  <Text style={[styles.workoutTitle, item.done && styles.workoutTitleDone]}>
+                    {item.title}
+                  </Text>
+                  <Text style={styles.workoutBurn}>
+                    {item.done ? 'Đã hoàn thành' : 'Chưa hoàn thành'}
+                  </Text>
+                </View>
+                <Ionicons
+                  name={item.done ? 'checkmark-circle' : 'ellipse-outline'}
+                  size={26}
+                  color={item.done ? colors.emerald : colors.textMuted}
+                />
+              </Pressable>
+            ))}
+          </View>
+        </>
+      ) : null}
 
       <View style={styles.sectionHeader}>
         <Text style={[TYPO.sectionTitle, { color: colors.textPrimary }]}>

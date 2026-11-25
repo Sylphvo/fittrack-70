@@ -48,12 +48,20 @@ export interface WorkoutItem {
   hasTimer?: boolean;
 }
 
+export interface CustomWorkoutLog {
+  id: string;
+  title: string;
+  reps: number;
+  done: boolean;
+}
+
 export interface DailyRecord {
   dateKey: string; // YYYY-MM-DD
   weightKg: number | null;
   meals: MealLogEntry[];
   waterMl: number;
   completedWorkouts: string[];
+  customWorkouts?: CustomWorkoutLog[];
   cardioElapsedSec: number;
   isClosedOut: boolean;
   closedOutAt?: string;
@@ -62,4 +70,5 @@ export interface DailyRecord {
 export interface FitTrackState {
   currentWeight: number;
   records: Record<string, DailyRecord>;
+  appliedSeeds?: string[];
 }
