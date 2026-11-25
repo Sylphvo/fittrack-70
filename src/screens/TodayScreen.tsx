@@ -12,44 +12,65 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { CircularGauge } from '../components/CircularGauge';
-import { DAILY_ROUTINE_STEPS, EVENING_WORKOUT_PLAN, FITTRACK_CONFIG } from '../config/fittrack';
+import { FoodLogModal } from '../components/FoodLogModal';
+import { FITTRACK_CONFIG } from '../config/fittrack';
 import { useTheme } from '../theme/ThemeContext';
 import { RADIUS, SPACING, ThemePalette, TYPO } from '../theme/tokens';
-import { DailyRecord } from '../types/fittrack';
+import { DailyRecord, GoogleUser, MealPreset } from '../types/fittrack';
 
 interface TodayScreenProps {
   todayKey: string;
+  user: GoogleUser | null;
   currentWeight: number;
   todayRecord: DailyRecord;
   totals: {
     kcal: number;
     protein: number;
+    burnedKcal: number;
     waterMl: number;
     remainingKcal: number;
     isInSafeZone: boolean;
     isOverHardCeiling: boolean;
+    totalReps: number;
+    completedCount: number;
+    totalWorkouts: number;
   };
-  streakDays: number;
   onSaveWeight: (weight: number) => void;
   onAdjustWater: (deltaMl: number) => void;
+  onAddMealsBatch: (
+    items: {
+      name: string;
+      kcal: number;
+      protein: number;
+      source?: 'ai_photo' | 'app_menu' | 'manual';
+      presetId?: string;
+    }[]
+  ) => void;
+  onAddPreset: (preset: MealPreset) => void;
   onAddMorningCombo: () => void;
-  onToggleCloseOut: () => void;
-  onNavigateMeals: () => void;
+  onRemoveMeal: (id: string) => void;
+  onToggleWorkout: (id: string) => void;
+  onLoadDefaultWorkouts: () => void;
   onNavigateWorkout: () => void;
+  onNavigateRoadmap: () => void;
 }
 
 export function TodayScreen({
   todayKey,
+  user,
   currentWeight,
   todayRecord,
   totals,
-  streakDays,
   onSaveWeight,
   onAdjustWater,
+  onAddMealsBatch,
+  onAddPreset,
   onAddMorningCombo,
-  onToggleCloseOut,
-  onNavigateMeals,
+  onRemoveMeal,
+  onToggleWorkout,
+  onLoadDefaultWorkouts,
   onNavigateWorkout,
+  onNavigateRoadmap,
 }: TodayScreenProps) {
   const { colors, mode, toggleTheme } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -58,18 +79,12 @@ export function TodayScreen({
     (todayRecord.weightKg ?? currentWeight).toFixed(1)
   );
   const [editingWeight, setEditingWeight] = useState(false);
+  const [foodModalOpen, setFoodModalOpen] = useState(false);
 
   const proteinPct = Math.min(100, Math.round((totals.protein / FITTRACK_CONFIG.TARGET_PROTEIN) * 100));
   const waterPct = Math.min(100, Math.round((totals.waterMl / FITTRACK_CONFIG.TARGET_WATER) * 100));
   const lostKg = Math.max(0, FITTRACK_CONFIG.START_WEIGHT - currentWeight);
   const toGoalKg = Math.max(0, currentWeight - FITTRACK_CONFIG.TARGET_WEIGHT);
-
-  const routineStatus: Record<string, boolean> = {
-    'rt-weight': todayRecord.weightKg !== null,
-    'rt-breakfast': todayRecord.meals.length > 0 && todayRecord.waterMl >= 500,
-    'rt-workout': todayRecord.completedWorkouts.length >= EVENING_WORKOUT_PLAN.length,
-    'rt-closeout': todayRecord.isClosedOut,
-  };
 
   const handleWeightSubmit = () => {
     const parsed = parseFloat(weightInput.replace(',', '.'));
@@ -79,30 +94,6 @@ export function TodayScreen({
       setWeightInput(parsed.toFixed(1));
       setEditingWeight(false);
     }
-  };
-
-  const handleWaterPress = (delta: number) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    onAdjustWater(delta);
-  };
-
-  const handleMorningComboPress = () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    onAddMorningCombo();
-  };
-
-  const handleCloseOutPress = () => {
-    Haptics.notificationAsync(
-      totals.isOverHardCeiling
-        ? Haptics.NotificationFeedbackType.Warning
-        : Haptics.NotificationFeedbackType.Success
-    ).catch(() => {});
-    onToggleCloseOut();
-  };
-
-  const handleToggleTheme = () => {
-    Haptics.selectionAsync().catch(() => {});
-    toggleTheme();
   };
 
   return (
@@ -119,15 +110,20 @@ export function TodayScreen({
         {/* Top Header */}
         <View style={styles.headerRow}>
           <View>
-            <Text style={styles.dateText}>{todayKey} · ZERO-STARCH</Text>
-            <Text style={[TYPO.title, { color: colors.textPrimary }]}>FitTrack 70</Text>
+            <Text style={styles.dateText}>{todayKey} · FITTRACK 70</Text>
+            <Text style={[TYPO.title, { color: colors.textPrimary }]}>
+              {user ? `Chào, ${user.name}` : 'Hôm nay'}
+            </Text>
           </View>
           <View style={styles.headerActions}>
             <Pressable
-              style={({ pressed }) => [styles.themeBtn, pressed && styles.pressed]}
-              onPress={handleToggleTheme}
+              style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}
+              onPress={() => {
+                Haptics.selectionAsync().catch(() => {});
+                toggleTheme();
+              }}
               accessibilityRole="button"
-              accessibilityLabel={mode === 'dark' ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối'}
+              accessibilityLabel="Đổi giao diện sáng tối"
             >
               <Ionicons
                 name={mode === 'dark' ? 'sunny-outline' : 'moon-outline'}
@@ -135,111 +131,37 @@ export function TodayScreen({
                 color={mode === 'dark' ? colors.amber : colors.textPrimary}
               />
             </Pressable>
-            <View style={styles.streakPill}>
-              <Ionicons name="flame" size={14} color={colors.amber} />
-              <Text style={styles.streakText}>{streakDays} ngày</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Hero Calorie Ring Card */}
-        <View style={styles.heroCard}>
-          <CircularGauge
-            value={totals.kcal}
-            target={FITTRACK_CONFIG.TARGET_KCAL}
-            hardMax={FITTRACK_CONFIG.SAFE_KCAL_MAX}
-          />
-          <View style={styles.heroFooter}>
-            <View style={styles.zoneChip}>
-              <View style={[styles.dot, { backgroundColor: colors.emerald }]} />
-              <Text style={styles.zoneText}>
-                Vùng an toàn: {FITTRACK_CONFIG.SAFE_KCAL_MIN}–{FITTRACK_CONFIG.SAFE_KCAL_MAX} kcal
-              </Text>
-            </View>
             <Pressable
-              onPress={onNavigateMeals}
-              style={({ pressed }) => [styles.quickLink, pressed && styles.pressed]}
+              style={({ pressed }) => [styles.accountPill, pressed && styles.pressed]}
+              onPress={onNavigateRoadmap}
               accessibilityRole="button"
-              accessibilityLabel="Mở thực đơn để thêm món"
+              accessibilityLabel="Tài khoản Google và lộ trình"
             >
-              <Ionicons name="add-circle" size={18} color={colors.emerald} />
-              <Text style={styles.quickLinkText}>Ghi món</Text>
+              <Ionicons
+                name={user ? 'person-circle' : 'logo-google'}
+                size={16}
+                color={user ? colors.emerald : colors.textPrimary}
+              />
+              <Text style={styles.accountPillText}>{user ? 'Google' : 'Đăng nhập'}</Text>
             </Pressable>
           </View>
         </View>
 
-        {/* Protein & Water Side-by-Side */}
-        <View style={styles.dualRow}>
-          <View style={styles.metricTile}>
-            <View style={styles.metricHead}>
-              <Ionicons name="barbell-outline" size={16} color={colors.amber} />
-              <Text style={styles.metricLabel}>Đạm giữ cơ</Text>
-            </View>
-            <Text style={styles.metricValue}>
-              {totals.protein}
-              <Text style={styles.metricUnit}> / {FITTRACK_CONFIG.TARGET_PROTEIN}g</Text>
-            </Text>
-            <View style={styles.barTrack}>
-              <View
-                style={[styles.barFill, { width: `${proteinPct}%`, backgroundColor: colors.amber }]}
-              />
-            </View>
-            <Text style={styles.metricSub}>{proteinPct}% mục tiêu ngày</Text>
-          </View>
-
-          <View style={styles.metricTile}>
-            <View style={styles.metricHead}>
-              <Ionicons name="water-outline" size={16} color={colors.cyan} />
-              <Text style={styles.metricLabel}>Nước & Điện giải</Text>
-            </View>
-            <Text style={styles.metricValue}>
-              {totals.waterMl}
-              <Text style={styles.metricUnit}> / {FITTRACK_CONFIG.TARGET_WATER}ml</Text>
-            </Text>
-            <View style={styles.barTrack}>
-              <View
-                style={[styles.barFill, { width: `${waterPct}%`, backgroundColor: colors.cyan }]}
-              />
-            </View>
-            <View style={styles.waterActions}>
-              <Pressable
-                style={({ pressed }) => [styles.waterBtn, pressed && styles.pressed]}
-                onPress={() => handleWaterPress(250)}
-                accessibilityRole="button"
-                accessibilityLabel="Thêm 250 ml nước"
-              >
-                <Text style={styles.waterBtnText}>+250</Text>
-              </Pressable>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.waterBtn,
-                  styles.waterBtnPrimary,
-                  pressed && styles.pressed,
-                ]}
-                onPress={() => handleWaterPress(500)}
-                accessibilityRole="button"
-                accessibilityLabel="Thêm 500 ml nước"
-              >
-                <Text style={[styles.waterBtnText, { color: colors.onAccent }]}>+500ml</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-
-        {/* Morning Weight Card (06:30) */}
-        <View style={styles.sectionCard}>
+        {/* 1. CÂN NẶNG ĐƯA LÊN ĐẦU TRANG */}
+        <View style={styles.weightTopCard}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleRow}>
               <Ionicons name="scale-outline" size={18} color={colors.emerald} />
               <Text style={[TYPO.sectionTitle, { color: colors.textPrimary }]}>
-                Cân nặng buổi sáng (06:30)
+                Cân nặng hiện tại
               </Text>
             </View>
             <Pressable
-              onPress={() => setEditingWeight((v) => !v)}
+              onPress={() => {
+                setWeightInput((todayRecord.weightKg ?? currentWeight).toFixed(1));
+                setEditingWeight((v) => !v);
+              }}
               hitSlop={10}
-              accessibilityRole="button"
-              accessibilityLabel="Chỉnh sửa cân nặng"
             >
               <Text style={styles.editText}>{editingWeight ? 'Đóng' : 'Cập nhật'}</Text>
             </Pressable>
@@ -266,13 +188,10 @@ export function TodayScreen({
                 placeholder="VD: 87.4"
                 placeholderTextColor={colors.textMuted}
                 style={styles.input}
-                accessibilityLabel="Nhập số cân nặng buổi sáng tính bằng kg"
               />
               <Pressable
                 style={({ pressed }) => [styles.saveBtn, pressed && styles.pressed]}
                 onPress={handleWeightSubmit}
-                accessibilityRole="button"
-                accessibilityLabel="Lưu cân nặng"
               >
                 <Text style={styles.saveBtnText}>Lưu cân</Text>
               </Pressable>
@@ -280,89 +199,226 @@ export function TodayScreen({
           ) : null}
         </View>
 
-        {/* 07:15 Quick Morning Combo */}
-        <Pressable
-          style={({ pressed }) => [styles.comboCard, pressed && styles.pressed]}
-          onPress={handleMorningComboPress}
-          accessibilityRole="button"
-          accessibilityLabel="Chọn nhanh combo 07 giờ 15 sáng gồm 3 trứng luộc, Americano đá và 500ml nước"
-        >
-          <View style={styles.comboIcon}>
-            <Ionicons name="sunny-outline" size={20} color={colors.amber} />
-          </View>
-          <View style={styles.flex}>
-            <Text style={styles.comboTitle}>Combo 07:15 Sáng (1 chạm)</Text>
-            <Text style={styles.comboSub}>
-              3 Trứng luộc + Americano đá + 500ml nước · 210 kcal · 16g đạm
-            </Text>
-          </View>
-          <Ionicons name="add-circle-outline" size={24} color={colors.amber} />
-        </Pressable>
+        {/* 2. VÒNG CALO & NÚT GHI MÓN (CHỤP AI / THEO APP) */}
+        <View style={styles.heroCard}>
+          <CircularGauge
+            value={totals.kcal}
+            target={FITTRACK_CONFIG.TARGET_KCAL}
+            hardMax={FITTRACK_CONFIG.SAFE_KCAL_MAX}
+          />
 
-        {/* Daily Routine Checklist */}
-        <View style={styles.sectionCard}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleRow}>
-              <Ionicons name="checkmark-done-outline" size={18} color={colors.cyan} />
-              <Text style={[TYPO.sectionTitle, { color: colors.textPrimary }]}>
-                Checklist vận hành hôm nay
+          <View style={styles.inOutRow}>
+            <View style={styles.inOutBox}>
+              <Text style={styles.inOutLabel}>Nạp vào</Text>
+              <Text style={[styles.inOutVal, { color: colors.emerald }]}>{totals.kcal} kcal</Text>
+            </View>
+            <View style={styles.inOutDivider} />
+            <View style={styles.inOutBox}>
+              <Text style={styles.inOutLabel}>Đốt tập luyện</Text>
+              <Text style={[styles.inOutVal, { color: colors.amber }]}>
+                -{totals.burnedKcal} kcal
               </Text>
             </View>
-            <Pressable onPress={onNavigateWorkout} hitSlop={8}>
-              <Text style={styles.editText}>Tập 18h15 →</Text>
-            </Pressable>
           </View>
 
-          <View style={styles.checklist}>
-            {DAILY_ROUTINE_STEPS.map((step) => {
-              const done = routineStatus[step.id];
-              return (
-                <View key={step.id} style={styles.checkRow}>
-                  <Ionicons
-                    name={done ? 'checkmark-circle' : 'ellipse-outline'}
-                    size={20}
-                    color={done ? colors.emerald : colors.textMuted}
-                  />
-                  <Text style={styles.checkTime}>{step.time}</Text>
-                  <Text style={[styles.checkLabel, done && styles.checkLabelDone]}>
-                    {step.label}
-                  </Text>
-                </View>
-              );
-            })}
+          <Pressable
+            style={({ pressed }) => [styles.logFoodCta, pressed && styles.pressed]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+              setFoodModalOpen(true);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Ghi món bằng chụp ảnh AI hoặc ăn theo menu app"
+          >
+            <Ionicons name="camera" size={19} color={colors.onAccent} />
+            <Text style={styles.logFoodCtaText}>Ghi món (Chụp ảnh AI / Theo App)</Text>
+          </Pressable>
+        </View>
+
+        {/* 3. ĐẠM & NƯỚC */}
+        <View style={styles.dualRow}>
+          <View style={styles.metricTile}>
+            <View style={styles.metricHead}>
+              <Ionicons name="barbell-outline" size={16} color={colors.amber} />
+              <Text style={styles.metricLabel}>Đạm giữ cơ</Text>
+            </View>
+            <Text style={styles.metricValue}>
+              {totals.protein}
+              <Text style={styles.metricUnit}> / {FITTRACK_CONFIG.TARGET_PROTEIN}g</Text>
+            </Text>
+            <View style={styles.barTrack}>
+              <View
+                style={[styles.barFill, { width: `${proteinPct}%`, backgroundColor: colors.amber }]}
+              />
+            </View>
+            <Text style={styles.metricSub}>{proteinPct}% mục tiêu ngày</Text>
+          </View>
+
+          <View style={styles.metricTile}>
+            <View style={styles.metricHead}>
+              <Ionicons name="water-outline" size={16} color={colors.cyan} />
+              <Text style={styles.metricLabel}>Nước uống</Text>
+            </View>
+            <Text style={styles.metricValue}>
+              {totals.waterMl}
+              <Text style={styles.metricUnit}> / {FITTRACK_CONFIG.TARGET_WATER}ml</Text>
+            </Text>
+            <View style={styles.barTrack}>
+              <View
+                style={[styles.barFill, { width: `${waterPct}%`, backgroundColor: colors.cyan }]}
+              />
+            </View>
+            <View style={styles.waterActions}>
+              <Pressable
+                style={({ pressed }) => [styles.waterBtn, pressed && styles.pressed]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                  onAdjustWater(250);
+                }}
+              >
+                <Text style={styles.waterBtnText}>+250</Text>
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.waterBtn,
+                  styles.waterBtnPrimary,
+                  pressed && styles.pressed,
+                ]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                  onAdjustWater(500);
+                }}
+              >
+                <Text style={[styles.waterBtnText, { color: colors.onAccent }]}>+500ml</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
 
-        {/* 22:00 Close Out Day CTA */}
-        <Pressable
-          style={({ pressed }) => [
-            styles.closeOutBtn,
-            todayRecord.isClosedOut && styles.closeOutBtnDone,
-            pressed && styles.pressed,
-          ]}
-          onPress={handleCloseOutPress}
-          accessibilityRole="button"
-          accessibilityLabel={todayRecord.isClosedOut ? 'Mở khóa ngày hôm nay' : 'Chốt ngày hôm nay'}
-        >
-          <Ionicons
-            name={todayRecord.isClosedOut ? 'shield-checkmark' : 'moon-outline'}
-            size={20}
-            color={todayRecord.isClosedOut ? colors.emerald : colors.onAccent}
-          />
-          <Text
-            style={[
-              styles.closeOutText,
-              todayRecord.isClosedOut && { color: colors.emerald },
-            ]}
-          >
-            {todayRecord.isClosedOut
-              ? `Đã chốt ngày lúc ${todayRecord.closedOutAt ?? '22:00'} · Ngủ trước 22:30`
-              : totals.isInSafeZone
-                ? 'Chốt ngày (22:00) · Đạt vùng xanh ≤ 1.450 kcal'
-                : 'Chốt ngày (22:00) · Lưu kỷ lục hôm nay'}
-          </Text>
-        </Pressable>
+        {/* 4. BÀI TẬP CHO NGÀY HÔM NAY (THAY CHECKLIST VẬN HÀNH) */}
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleRow}>
+              <Ionicons name="fitness-outline" size={18} color={colors.emerald} />
+              <Text style={[TYPO.sectionTitle, { color: colors.textPrimary }]}>
+                Bài tập hôm nay ({totals.totalReps} cái)
+              </Text>
+            </View>
+            <Pressable onPress={onNavigateWorkout} hitSlop={8}>
+              <Text style={styles.editText}>Thêm bài →</Text>
+            </Pressable>
+          </View>
+
+          {todayRecord.workouts.length === 0 ? (
+            <View style={styles.emptyBox}>
+              <Text style={styles.emptyText}>Chưa có bài tập nào cho hôm nay.</Text>
+              <Pressable style={styles.smallActionBtn} onPress={onLoadDefaultWorkouts}>
+                <Text style={styles.smallActionText}>+ Nạp 3 bài bụng tại nhà (100 cái)</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View style={styles.listGap}>
+              {todayRecord.workouts.map((w) => (
+                <Pressable
+                  key={w.id}
+                  style={({ pressed }) => [
+                    styles.workoutRow,
+                    w.done && styles.workoutRowDone,
+                    pressed && styles.pressed,
+                  ]}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                    onToggleWorkout(w.id);
+                  }}
+                >
+                  <Ionicons
+                    name={w.done ? 'checkmark-circle' : 'ellipse-outline'}
+                    size={22}
+                    color={w.done ? colors.emerald : colors.textMuted}
+                  />
+                  <View style={styles.flex}>
+                    <Text style={[styles.workoutName, w.done && styles.workoutNameDone]}>
+                      {w.title}
+                    </Text>
+                    <Text style={styles.workoutMeta}>
+                      {w.reps} {w.unit || 'cái'} · Đốt ~{w.estimatedKcal} kcal
+                    </Text>
+                  </View>
+                  <View style={styles.repsPill}>
+                    <Text style={styles.repsPillText}>
+                      {w.reps} {w.unit || 'cái'}
+                    </Text>
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+          )}
+        </View>
+
+        {/* 5. DANH SÁCH CALO ĐÃ NẠP HÔM NAY */}
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleRow}>
+              <Ionicons name="restaurant-outline" size={18} color={colors.amber} />
+              <Text style={[TYPO.sectionTitle, { color: colors.textPrimary }]}>
+                Món đã nạp hôm nay ({todayRecord.meals.length})
+              </Text>
+            </View>
+            <Pressable onPress={() => setFoodModalOpen(true)} hitSlop={8}>
+              <Text style={styles.editText}>+ Ghi món</Text>
+            </Pressable>
+          </View>
+
+          {todayRecord.meals.length === 0 ? (
+            <Text style={styles.emptyText}>
+              Chưa ghi món nào hôm nay. Bấm "Ghi món" để chụp ảnh AI hoặc chọn thực đơn có sẵn.
+            </Text>
+          ) : (
+            <View style={styles.listGap}>
+              {todayRecord.meals.map((meal) => (
+                <View key={meal.id} style={styles.mealRow}>
+                  <View style={styles.timeBadge}>
+                    <Text style={styles.timeBadgeText}>{meal.timestamp}</Text>
+                  </View>
+                  <View style={styles.flex}>
+                    <Text style={styles.mealName} numberOfLines={2}>
+                      {meal.name}
+                    </Text>
+                    <Text style={styles.mealMeta}>
+                      {meal.kcal} kcal · {meal.protein}g đạm
+                    </Text>
+                  </View>
+                  <Pressable
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                      onRemoveMeal(meal.id);
+                    }}
+                    hitSlop={10}
+                    style={styles.deleteBtn}
+                  >
+                    <Ionicons name="trash-outline" size={17} color={colors.textMuted} />
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
       </ScrollView>
+
+      <FoodLogModal
+        visible={foodModalOpen}
+        context={{
+          currentWeight,
+          consumedKcal: totals.kcal,
+          consumedProtein: totals.protein,
+          burnedKcal: totals.burnedKcal,
+          waterMl: totals.waterMl,
+        }}
+        onClose={() => setFoodModalOpen(false)}
+        onConfirmBatch={onAddMealsBatch}
+        onAddPreset={onAddPreset}
+        onAddMorningCombo={onAddMorningCombo}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -385,7 +441,7 @@ const createStyles = (c: ThemePalette) =>
       alignItems: 'center',
       gap: 8,
     },
-    themeBtn: {
+    iconBtn: {
       width: 36,
       height: 36,
       borderRadius: 18,
@@ -395,26 +451,118 @@ const createStyles = (c: ThemePalette) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
+    accountPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.borderStrong,
+      paddingHorizontal: 10,
+      paddingVertical: 7,
+      borderRadius: RADIUS.full,
+    },
+    accountPillText: {
+      color: c.textPrimary,
+      fontSize: 12,
+      fontWeight: '700',
+    },
     dateText: {
       color: c.textMuted,
       fontSize: 11,
       fontWeight: '700',
       letterSpacing: 0.9,
     },
-    streakPill: {
+    weightTopCard: {
+      backgroundColor: c.surface,
+      borderRadius: RADIUS.lg,
+      borderWidth: 1,
+      borderColor: c.emeraldBorder,
+      padding: SPACING.md,
+      gap: SPACING.sm,
+    },
+    sectionCard: {
+      backgroundColor: c.surface,
+      borderRadius: RADIUS.lg,
+      borderWidth: 1,
+      borderColor: c.border,
+      padding: SPACING.md,
+      gap: SPACING.sm,
+    },
+    sectionHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    sectionTitleRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 4,
-      backgroundColor: c.amberDim,
+      gap: 8,
+    },
+    editText: {
+      color: c.emerald,
+      fontSize: 13,
+      fontWeight: '700',
+    },
+    weightSummaryRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    weightBig: {
+      color: c.textPrimary,
+      fontSize: 28,
+      fontWeight: '800',
+      fontVariant: ['tabular-nums'],
+    },
+    weightMeta: {
+      color: c.textSecondary,
+      fontSize: 12,
+      marginTop: 2,
+      fontVariant: ['tabular-nums'],
+    },
+    goalBadge: {
+      backgroundColor: c.emeraldDim,
       borderWidth: 1,
-      borderColor: c.amberBorder,
+      borderColor: c.emeraldBorder,
       paddingHorizontal: 10,
       paddingVertical: 6,
-      borderRadius: RADIUS.full,
+      borderRadius: RADIUS.sm,
     },
-    streakText: {
-      color: c.amber,
+    goalBadgeText: {
+      color: c.emerald,
       fontSize: 12,
+      fontWeight: '800',
+      fontVariant: ['tabular-nums'],
+    },
+    weightInputRow: {
+      flexDirection: 'row',
+      gap: SPACING.sm,
+      marginTop: 4,
+    },
+    input: {
+      flex: 1,
+      height: 44,
+      backgroundColor: c.bg,
+      borderWidth: 1,
+      borderColor: c.borderStrong,
+      borderRadius: RADIUS.sm,
+      paddingHorizontal: 12,
+      color: c.textPrimary,
+      fontSize: 15,
+      fontWeight: '600',
+    },
+    saveBtn: {
+      height: 44,
+      paddingHorizontal: 18,
+      backgroundColor: c.emerald,
+      borderRadius: RADIUS.sm,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    saveBtnText: {
+      color: c.onAccent,
+      fontSize: 14,
       fontWeight: '700',
     },
     heroCard: {
@@ -427,44 +575,47 @@ const createStyles = (c: ThemePalette) =>
       alignItems: 'center',
       gap: SPACING.md,
     },
-    heroFooter: {
+    inOutRow: {
+      flexDirection: 'row',
       width: '100%',
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingTop: SPACING.sm,
+      paddingVertical: 10,
       borderTopWidth: 1,
-      borderTopColor: c.border,
+      borderBottomWidth: 1,
+      borderColor: c.border,
     },
-    zoneChip: {
-      flexDirection: 'row',
+    inOutBox: {
+      flex: 1,
       alignItems: 'center',
-      gap: 6,
+      gap: 2,
     },
-    dot: {
-      width: 8,
-      height: 8,
-      borderRadius: 4,
+    inOutDivider: {
+      width: 1,
+      backgroundColor: c.border,
     },
-    zoneText: {
-      color: c.textSecondary,
-      fontSize: 12,
+    inOutLabel: {
+      color: c.textMuted,
+      fontSize: 11,
       fontWeight: '600',
+    },
+    inOutVal: {
+      fontSize: 16,
+      fontWeight: '800',
       fontVariant: ['tabular-nums'],
     },
-    quickLink: {
+    logFoodCta: {
+      width: '100%',
+      minHeight: 50,
+      borderRadius: RADIUS.md,
+      backgroundColor: c.emerald,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 5,
-      paddingHorizontal: 10,
-      paddingVertical: 6,
-      borderRadius: RADIUS.full,
-      backgroundColor: c.emeraldDim,
+      justifyContent: 'center',
+      gap: 8,
     },
-    quickLinkText: {
-      color: c.emerald,
-      fontSize: 12,
-      fontWeight: '700',
+    logFoodCtaText: {
+      color: c.onAccent,
+      fontSize: 14,
+      fontWeight: '800',
     },
     dualRow: {
       flexDirection: 'row',
@@ -540,165 +691,110 @@ const createStyles = (c: ThemePalette) =>
       fontWeight: '700',
       fontVariant: ['tabular-nums'],
     },
-    sectionCard: {
-      backgroundColor: c.surface,
-      borderRadius: RADIUS.lg,
-      borderWidth: 1,
-      borderColor: c.border,
-      padding: SPACING.md,
-      gap: SPACING.sm,
-    },
-    sectionHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-    },
-    sectionTitleRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
+    listGap: {
       gap: 8,
     },
-    editText: {
-      color: c.emerald,
-      fontSize: 13,
-      fontWeight: '700',
-    },
-    weightSummaryRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-    },
-    weightBig: {
-      color: c.textPrimary,
-      fontSize: 28,
-      fontWeight: '800',
-      fontVariant: ['tabular-nums'],
-    },
-    weightMeta: {
-      color: c.textSecondary,
-      fontSize: 12,
-      marginTop: 2,
-      fontVariant: ['tabular-nums'],
-    },
-    goalBadge: {
-      backgroundColor: c.surfaceElevated,
-      borderWidth: 1,
-      borderColor: c.borderStrong,
-      paddingHorizontal: 10,
-      paddingVertical: 6,
-      borderRadius: RADIUS.sm,
-    },
-    goalBadgeText: {
-      color: c.emerald,
-      fontSize: 12,
-      fontWeight: '800',
-      fontVariant: ['tabular-nums'],
-    },
-    weightInputRow: {
-      flexDirection: 'row',
-      gap: SPACING.sm,
-      marginTop: 4,
-    },
-    input: {
-      flex: 1,
-      height: 44,
-      backgroundColor: c.bg,
-      borderWidth: 1,
-      borderColor: c.borderStrong,
-      borderRadius: RADIUS.sm,
-      paddingHorizontal: 12,
-      color: c.textPrimary,
-      fontSize: 15,
-      fontWeight: '600',
-    },
-    saveBtn: {
-      height: 44,
-      paddingHorizontal: 18,
-      backgroundColor: c.emerald,
-      borderRadius: RADIUS.sm,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    saveBtnText: {
-      color: c.onAccent,
-      fontSize: 14,
-      fontWeight: '700',
-    },
-    comboCard: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 12,
-      backgroundColor: c.surface,
-      borderRadius: RADIUS.lg,
-      borderWidth: 1,
-      borderColor: c.amberBorder,
-      padding: SPACING.md,
-    },
-    comboIcon: {
-      width: 40,
-      height: 40,
-      borderRadius: RADIUS.sm,
-      backgroundColor: c.amberDim,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    comboTitle: {
-      color: c.textPrimary,
-      fontSize: 14,
-      fontWeight: '700',
-    },
-    comboSub: {
-      color: c.textSecondary,
-      fontSize: 12,
-      marginTop: 2,
-    },
-    checklist: {
-      gap: 10,
-      marginTop: 2,
-    },
-    checkRow: {
-      flexDirection: 'row',
+    emptyBox: {
       alignItems: 'center',
       gap: 10,
+      paddingVertical: 8,
     },
-    checkTime: {
-      color: c.textMuted,
-      fontSize: 12,
-      fontWeight: '700',
-      width: 42,
-      fontVariant: ['tabular-nums'],
-    },
-    checkLabel: {
-      flex: 1,
-      color: c.textPrimary,
-      fontSize: 13,
-      fontWeight: '500',
-    },
-    checkLabelDone: {
+    emptyText: {
       color: c.textSecondary,
-      textDecorationLine: 'line-through',
+      fontSize: 13,
+      lineHeight: 19,
     },
-    closeOutBtn: {
-      minHeight: 54,
-      borderRadius: RADIUS.md,
-      backgroundColor: c.emerald,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 8,
-      paddingHorizontal: SPACING.md,
-    },
-    closeOutBtnDone: {
+    smallActionBtn: {
+      paddingHorizontal: 14,
+      paddingVertical: 9,
+      borderRadius: RADIUS.full,
       backgroundColor: c.emeraldDim,
       borderWidth: 1,
       borderColor: c.emeraldBorder,
     },
-    closeOutText: {
-      color: c.onAccent,
-      fontSize: 14,
+    smallActionText: {
+      color: c.emerald,
+      fontSize: 12,
+      fontWeight: '700',
+    },
+    workoutRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      backgroundColor: c.surfaceMuted,
+      borderRadius: RADIUS.md,
+      borderWidth: 1,
+      borderColor: c.border,
+      padding: 12,
+    },
+    workoutRowDone: {
+      borderColor: c.emeraldBorder,
+    },
+    workoutName: {
+      color: c.textPrimary,
+      fontSize: 13.5,
+      fontWeight: '700',
+    },
+    workoutNameDone: {
+      color: c.textSecondary,
+      textDecorationLine: 'line-through',
+    },
+    workoutMeta: {
+      color: c.textMuted,
+      fontSize: 11.5,
+      marginTop: 2,
+      fontVariant: ['tabular-nums'],
+    },
+    repsPill: {
+      backgroundColor: c.emeraldDim,
+      paddingHorizontal: 9,
+      paddingVertical: 4,
+      borderRadius: RADIUS.full,
+    },
+    repsPillText: {
+      color: c.emerald,
+      fontSize: 11.5,
       fontWeight: '800',
+      fontVariant: ['tabular-nums'],
     },
-    pressed: {
-      opacity: 0.78,
+    mealRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      backgroundColor: c.surfaceMuted,
+      borderRadius: RADIUS.md,
+      borderWidth: 1,
+      borderColor: c.border,
+      padding: 10,
     },
+    timeBadge: {
+      backgroundColor: c.surfaceElevated,
+      paddingHorizontal: 8,
+      paddingVertical: 5,
+      borderRadius: RADIUS.sm,
+    },
+    timeBadgeText: {
+      color: c.textSecondary,
+      fontSize: 11,
+      fontWeight: '700',
+      fontVariant: ['tabular-nums'],
+    },
+    mealName: {
+      color: c.textPrimary,
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    mealMeta: {
+      color: c.textMuted,
+      fontSize: 11.5,
+      marginTop: 2,
+      fontVariant: ['tabular-nums'],
+    },
+    deleteBtn: {
+      width: 32,
+      height: 32,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    pressed: { opacity: 0.78 },
   });

@@ -2,16 +2,12 @@ import React, { memo, useMemo } from 'react';
 import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import Svg, { Circle, Defs, Line, LinearGradient, Path, Stop } from 'react-native-svg';
 import { FITTRACK_CONFIG } from '../config/fittrack';
+import { TrajectoryPoint } from '../store/useFitTrackStore';
 import { useTheme } from '../theme/ThemeContext';
 import { RADIUS, SPACING, ThemePalette } from '../theme/tokens';
 
-interface WeightPoint {
-  dateKey: string;
-  weightKg: number;
-}
-
 interface WeightChartProps {
-  points: WeightPoint[];
+  points: TrajectoryPoint[];
 }
 
 export const WeightChart = memo(function WeightChart({ points }: WeightChartProps) {
@@ -20,7 +16,7 @@ export const WeightChart = memo(function WeightChart({ points }: WeightChartProp
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const chartWidth = Math.max(260, Math.min(width, 430) - SPACING.md * 4);
-  const chartHeight = 160;
+  const chartHeight = 168;
   const padX = 16;
   const padY = 18;
 
@@ -53,11 +49,13 @@ export const WeightChart = memo(function WeightChart({ points }: WeightChartProp
       : '';
 
   const targetY = mapY(FITTRACK_CONFIG.TARGET_WEIGHT);
+  const firstPt = points[0];
+  const lastPt = points[points.length - 1];
 
   return (
     <View style={styles.card}>
       <View style={styles.header}>
-        <Text style={styles.title}>Biểu đồ cân nặng</Text>
+        <Text style={styles.title}>Biểu đồ lộ trình (Calo + Cân thực tế)</Text>
         <Text style={styles.legend}>Mục tiêu {FITTRACK_CONFIG.TARGET_WEIGHT.toFixed(1)} kg</Text>
       </View>
 
@@ -98,21 +96,37 @@ export const WeightChart = memo(function WeightChart({ points }: WeightChartProp
             key={pt.dateKey}
             cx={pt.x}
             cy={pt.y}
-            r={4.5}
-            fill={colors.surface}
-            stroke={colors.emerald}
-            strokeWidth={2.5}
+            r={pt.isActual ? 5 : 3.5}
+            fill={pt.isActual ? colors.emerald : colors.surface}
+            stroke={pt.isActual ? colors.emerald : colors.cyan}
+            strokeWidth={2}
           />
         ))}
       </Svg>
 
       <View style={styles.axisRow}>
         <Text style={styles.axisLabel}>
-          Khởi điểm: {FITTRACK_CONFIG.START_WEIGHT.toFixed(1)} kg
+          Bắt đầu: {firstPt?.dateKey ?? ''} ({firstPt?.weightKg.toFixed(1) ?? '88.0'} kg)
         </Text>
         <Text style={styles.axisLabel}>
-          Hiện tại: {points[points.length - 1]?.weightKg.toFixed(1)} kg
+          Hôm nay: {lastPt?.weightKg.toFixed(1) ?? '88.0'} kg
         </Text>
+      </View>
+
+      <View style={styles.dotLegendRow}>
+        <View style={styles.dotLegendItem}>
+          <View style={[styles.legendDot, { backgroundColor: colors.emerald }]} />
+          <Text style={styles.dotLegendText}>Cân thực tế</Text>
+        </View>
+        <View style={styles.dotLegendItem}>
+          <View
+            style={[
+              styles.legendDot,
+              { backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.cyan },
+            ]}
+          />
+          <Text style={styles.dotLegendText}>Ước tính từ Calo ngày</Text>
+        </View>
       </View>
     </View>
   );
@@ -126,32 +140,51 @@ const createStyles = (c: ThemePalette) =>
       borderWidth: 1,
       borderColor: c.border,
       padding: SPACING.md,
+      gap: 6,
     },
     header: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: SPACING.xs,
     },
     title: {
       color: c.textPrimary,
-      fontSize: 15,
+      fontSize: 14,
       fontWeight: '700',
     },
     legend: {
       color: c.emerald,
-      fontSize: 12,
-      fontWeight: '600',
+      fontSize: 11.5,
+      fontWeight: '700',
       fontVariant: ['tabular-nums'],
     },
     axisRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      marginTop: 4,
     },
     axisLabel: {
       color: c.textSecondary,
-      fontSize: 12,
+      fontSize: 11.5,
       fontVariant: ['tabular-nums'],
+    },
+    dotLegendRow: {
+      flexDirection: 'row',
+      gap: 14,
+      marginTop: 2,
+    },
+    dotLegendItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+    },
+    legendDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+    },
+    dotLegendText: {
+      color: c.textMuted,
+      fontSize: 11,
+      fontWeight: '600',
     },
   });

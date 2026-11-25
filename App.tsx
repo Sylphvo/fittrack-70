@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -13,15 +13,14 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
-import { AiCoachScreen } from './src/screens/AiCoachScreen';
-import { MealsScreen } from './src/screens/MealsScreen';
 import { RoadmapScreen } from './src/screens/RoadmapScreen';
 import { TodayScreen } from './src/screens/TodayScreen';
 import { WorkoutScreen } from './src/screens/WorkoutScreen';
+import { loadSavedUser, saveUser } from './src/services/googleAuth';
 import { useFitTrackStore } from './src/store/useFitTrackStore';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { SPACING, ThemePalette } from './src/theme/tokens';
-import { TabKey } from './src/types/fittrack';
+import { GoogleUser, TabKey } from './src/types/fittrack';
 
 const TABS: {
   key: TabKey;
@@ -30,15 +29,22 @@ const TABS: {
   activeIcon: keyof typeof Ionicons.glyphMap;
 }[] = [
   { key: 'today', label: 'Hôm nay', icon: 'pulse-outline', activeIcon: 'pulse' },
-  { key: 'meals', label: 'Thực đơn', icon: 'restaurant-outline', activeIcon: 'restaurant' },
-  { key: 'ai', label: 'AI Quét', icon: 'camera-outline', activeIcon: 'camera' },
-  { key: 'workout', label: 'Tập 18h15', icon: 'timer-outline', activeIcon: 'timer' },
+  { key: 'workout', label: 'Tập tại nhà', icon: 'fitness-outline', activeIcon: 'fitness' },
   { key: 'roadmap', label: 'Lộ trình', icon: 'trending-down-outline', activeIcon: 'trending-down' },
 ];
 
 function MainApp() {
   const [activeTab, setActiveTab] = useState<TabKey>('today');
-  const store = useFitTrackStore();
+  const [user, setUser] = useState<GoogleUser | null>(null);
+  const [authLoaded, setAuthLoaded] = useState(false);
+
+  useEffect(() => {
+    loadSavedUser()
+      .then((u) => setUser(u))
+      .finally(() => setAuthLoaded(true));
+  }, []);
+
+  const store = useFitTrackStore(user);
   const { colors, mode } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
@@ -47,10 +53,19 @@ function MainApp() {
     setActiveTab(tab);
   }, []);
 
+  const handleSignIn = useCallback((signed: GoogleUser) => {
+    setUser(signed);
+  }, []);
+
+  const handleSignOut = useCallback(() => {
+    saveUser(null).catch(() => {});
+    setUser(null);
+  }, []);
+
   const Container = Platform.OS === 'web' ? View : SafeAreaView;
   const TabWrapper = Platform.OS === 'web' ? View : SafeAreaView;
 
-  if (!store.isLoaded) {
+  if (!authLoaded || !store.isLoaded) {
     return (
       <Container style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.emerald} />
@@ -70,65 +85,49 @@ function MainApp() {
         {activeTab === 'today' ? (
           <TodayScreen
             todayKey={store.todayKey}
+            user={user}
             currentWeight={store.currentWeight}
             todayRecord={store.todayRecord}
             totals={store.totals}
-            streakDays={store.streakDays}
             onSaveWeight={store.setMorningWeight}
             onAdjustWater={store.adjustWater}
-            onAddMorningCombo={store.addMorningCombo}
-            onToggleCloseOut={store.toggleCloseOutDay}
-            onNavigateMeals={() => handleSelectTab('meals')}
-            onNavigateWorkout={() => handleSelectTab('workout')}
-          />
-        ) : null}
-
-        {activeTab === 'meals' ? (
-          <MealsScreen
-            meals={store.todayRecord.meals}
-            totalKcal={store.totals.kcal}
-            totalProtein={store.totals.protein}
+            onAddMealsBatch={store.addMealsBatch}
             onAddPreset={store.addPresetMeal}
-            onAddCustom={store.addMeal}
+            onAddMorningCombo={store.addMorningCombo}
             onRemoveMeal={store.removeMeal}
-          />
-        ) : null}
-
-        {activeTab === 'ai' ? (
-          <AiCoachScreen
-            context={{
-              currentWeight: store.currentWeight,
-              consumedKcal: store.totals.kcal,
-              consumedProtein: store.totals.protein,
-              waterMl: store.totals.waterMl,
-              workoutsDone: store.todayRecord.completedWorkouts.length,
-            }}
-            onAddMeal={store.addMeal}
+            onToggleWorkout={store.toggleWorkoutItem}
+            onLoadDefaultWorkouts={store.loadDefaultHomePlanToday}
+            onNavigateWorkout={() => handleSelectTab('workout')}
+            onNavigateRoadmap={() => handleSelectTab('roadmap')}
           />
         ) : null}
 
         {activeTab === 'workout' ? (
           <WorkoutScreen
-            completedWorkouts={store.todayRecord.completedWorkouts}
-            customWorkouts={store.todayRecord.customWorkouts ?? []}
+            workouts={store.todayRecord.workouts}
+            burnedKcal={store.totals.burnedKcal}
             cardioElapsedSec={store.todayRecord.cardioElapsedSec}
-            onToggleWorkout={store.toggleWorkout}
-            onToggleCustomWorkout={store.toggleCustomWorkout}
+            onToggleWorkout={store.toggleWorkoutItem}
+            onAddTemplate={store.addWorkoutFromTemplate}
+            onAddCustomWorkout={store.addCustomWorkout}
+            onRemoveWorkout={store.removeWorkoutItem}
             onUpdateCardioElapsed={store.setCardioElapsed}
           />
         ) : null}
 
         {activeTab === 'roadmap' ? (
           <RoadmapScreen
+            user={user}
             currentWeight={store.currentWeight}
-            weightHistory={store.weightHistory}
+            weightTrajectory={store.weightTrajectory}
             historyList={store.historyList}
+            onSignInUser={handleSignIn}
+            onSignOutUser={handleSignOut}
             onImportJson={store.importDailyJson}
           />
         ) : null}
       </View>
 
-      {/* Bottom Tab Bar */}
       <TabWrapper
         style={styles.tabBarSafe}
         {...(Platform.OS === 'web' ? {} : { edges: ['bottom'] as const })}

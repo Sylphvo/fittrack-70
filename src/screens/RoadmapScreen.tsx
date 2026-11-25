@@ -1,31 +1,95 @@
-import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { WeightChart } from '../components/WeightChart';
-import { EVENING_WORKOUT_PLAN, FITTRACK_CONFIG } from '../config/fittrack';
+import { FITTRACK_CONFIG } from '../config/fittrack';
+import {
+  loadGoogleClientId,
+  saveGoogleClientId,
+  signInWithGoogleEmailLocal,
+  signInWithGoogleOAuthWeb,
+} from '../services/googleAuth';
+import { calculateBurnedKcal, TrajectoryPoint } from '../store/useFitTrackStore';
 import { useTheme } from '../theme/ThemeContext';
 import { RADIUS, SPACING, ThemePalette, TYPO } from '../theme/tokens';
-import { DailyRecord } from '../types/fittrack';
+import { DailyRecord, GoogleUser } from '../types/fittrack';
 
 interface RoadmapScreenProps {
+  user: GoogleUser | null;
   currentWeight: number;
-  weightHistory: { dateKey: string; weightKg: number }[];
+  weightTrajectory: TrajectoryPoint[];
   historyList: DailyRecord[];
+  onSignInUser: (user: GoogleUser) => void;
+  onSignOutUser: () => void;
   onImportJson: (rawJson: string) => { ok: boolean; message: string };
 }
 
 export function RoadmapScreen({
+  user,
   currentWeight,
-  weightHistory,
+  weightTrajectory,
   historyList,
+  onSignInUser,
+  onSignOutUser,
   onImportJson,
 }: RoadmapScreenProps) {
   const { colors, mode, toggleTheme } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+
   const [showImport, setShowImport] = useState(false);
   const [jsonText, setJsonText] = useState('');
   const [importStatus, setImportStatus] = useState<{ ok: boolean; message: string } | null>(null);
+
+  const [showAuthForm, setShowAuthForm] = useState(false);
+  const [emailInput, setEmailInput] = useState('');
+  const [nameInput, setNameInput] = useState('');
+  const [googleClientId, setGoogleClientId] = useState('');
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [isSigningIn, setIsSigningIn] = useState(false);
+
+  useEffect(() => {
+    loadGoogleClientId().then(setGoogleClientId);
+  }, []);
+
+  const totalToLose = FITTRACK_CONFIG.START_WEIGHT - FITTRACK_CONFIG.TARGET_WEIGHT;
+  const lostSoFar = Math.max(0, FITTRACK_CONFIG.START_WEIGHT - currentWeight);
+  const remainingKg = Math.max(0, currentWeight - FITTRACK_CONFIG.TARGET_WEIGHT);
+  const pct = Math.min(100, Math.max(0, Math.round((lostSoFar / totalToLose) * 100)));
+
+  const handleGoogleOAuth = async () => {
+    setAuthError(null);
+    if (!googleClientId.trim()) {
+      setShowAuthForm(true);
+      return;
+    }
+    try {
+      setIsSigningIn(true);
+      await saveGoogleClientId(googleClientId);
+      const signed = await signInWithGoogleOAuthWeb(googleClientId);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      onSignInUser(signed);
+      setShowAuthForm(false);
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Đăng nhập Google thất bại.');
+    } finally {
+      setIsSigningIn(false);
+    }
+  };
+
+  const handleLocalGoogleLogin = async () => {
+    setAuthError(null);
+    try {
+      const signed = await signInWithGoogleEmailLocal(emailInput, nameInput);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      onSignInUser(signed);
+      setEmailInput('');
+      setNameInput('');
+      setShowAuthForm(false);
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Email không hợp lệ.');
+    }
+  };
 
   const handleImportSubmit = () => {
     const res = onImportJson(jsonText);
@@ -36,55 +100,146 @@ export function RoadmapScreen({
     }
   };
 
-  const totalToLose = FITTRACK_CONFIG.START_WEIGHT - FITTRACK_CONFIG.TARGET_WEIGHT;
-  const lostSoFar = Math.max(0, FITTRACK_CONFIG.START_WEIGHT - currentWeight);
-  const remainingKg = Math.max(0, currentWeight - FITTRACK_CONFIG.TARGET_WEIGHT);
-  const pct = Math.min(100, Math.max(0, Math.round((lostSoFar / totalToLose) * 100)));
-
-  const handleToggleTheme = () => {
-    Haptics.selectionAsync().catch(() => {});
-    toggleTheme();
-  };
-
   return (
     <ScrollView
       style={styles.flex}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
     >
+      {/* Header */}
       <View style={styles.headerRow}>
         <View>
           <Text style={styles.kicker}>LỘ TRÌNH 88.0 KG → 70.0 KG</Text>
-          <Text style={[TYPO.title, { color: colors.textPrimary }]}>Tiến độ & Kỷ lục</Text>
+          <Text style={[TYPO.title, { color: colors.textPrimary }]}>Lộ trình & Tài khoản</Text>
         </View>
         <View style={styles.headerActions}>
           <Pressable
-            style={({ pressed }) => [styles.themePill, pressed && styles.pressed]}
+            style={({ pressed }) => [styles.pillBtn, pressed && styles.pressed]}
             onPress={() => setShowImport((v) => !v)}
-            accessibilityRole="button"
-            accessibilityLabel="Nhập dữ liệu JSON ngày"
           >
             <Ionicons name="code-download-outline" size={15} color={colors.emerald} />
-            <Text style={styles.themePillText}>JSON</Text>
+            <Text style={styles.pillBtnText}>JSON</Text>
           </Pressable>
           <Pressable
-            style={({ pressed }) => [styles.themePill, pressed && styles.pressed]}
-            onPress={handleToggleTheme}
-            accessibilityRole="button"
-            accessibilityLabel="Đổi giao diện sáng tối"
+            style={({ pressed }) => [styles.pillBtn, pressed && styles.pressed]}
+            onPress={() => {
+              Haptics.selectionAsync().catch(() => {});
+              toggleTheme();
+            }}
           >
             <Ionicons
               name={mode === 'dark' ? 'sunny-outline' : 'moon-outline'}
               size={15}
               color={mode === 'dark' ? colors.amber : colors.textPrimary}
             />
-            <Text style={styles.themePillText}>{mode === 'dark' ? 'Sáng' : 'Tối'}</Text>
+            <Text style={styles.pillBtnText}>{mode === 'dark' ? 'Sáng' : 'Tối'}</Text>
           </Pressable>
         </View>
       </View>
 
+      {/* Google Account Card */}
+      <View style={styles.card}>
+        {user ? (
+          <View style={styles.userRow}>
+            {user.avatarUrl ? (
+              <Image source={{ uri: user.avatarUrl }} style={styles.avatar} />
+            ) : (
+              <View style={styles.avatarFallback}>
+                <Text style={styles.avatarInitial}>
+                  {(user.name[0] || 'G').toUpperCase()}
+                </Text>
+              </View>
+            )}
+            <View style={styles.flex}>
+              <Text style={styles.userName}>{user.name}</Text>
+              <Text style={styles.userEmail}>{user.email}</Text>
+              <Text style={styles.userStatus}>Đã lưu lịch sử theo tài khoản Google</Text>
+            </View>
+            <Pressable
+              style={({ pressed }) => [styles.signOutBtn, pressed && styles.pressed]}
+              onPress={onSignOutUser}
+            >
+              <Text style={styles.signOutText}>Đăng xuất</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <View style={styles.authBox}>
+            <View style={styles.authHead}>
+              <Ionicons name="logo-google" size={20} color={colors.emerald} />
+              <View style={styles.flex}>
+                <Text style={styles.userName}>Đăng nhập tài khoản Google</Text>
+                <Text style={styles.userEmail}>
+                  Lưu riêng hồ sơ, cân nặng & lịch sử nạp/đốt calo theo tài khoản của bạn
+                </Text>
+              </View>
+            </View>
+            <Pressable
+              style={({ pressed }) => [styles.googleBtn, pressed && styles.pressed]}
+              onPress={() => setShowAuthForm((v) => !v)}
+            >
+              <Ionicons name="logo-google" size={17} color={colors.onAccent} />
+              <Text style={styles.googleBtnText}>
+                {showAuthForm ? 'Đóng khung đăng nhập' : 'Đăng nhập bằng Google'}
+              </Text>
+            </Pressable>
+
+            {showAuthForm ? (
+              <View style={styles.authForm}>
+                <Text style={styles.formLabel}>Đăng nhập nhanh bằng Email Google:</Text>
+                <TextInput
+                  value={emailInput}
+                  onChangeText={setEmailInput}
+                  placeholder="tenban@gmail.com"
+                  placeholderTextColor={colors.textMuted}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  style={styles.input}
+                />
+                <TextInput
+                  value={nameInput}
+                  onChangeText={setNameInput}
+                  placeholder="Tên hiển thị (tuỳ chọn)"
+                  placeholderTextColor={colors.textMuted}
+                  style={styles.input}
+                />
+                <Pressable style={styles.saveProfileBtn} onPress={handleLocalGoogleLogin}>
+                  <Text style={styles.saveProfileText}>Tiếp tục với Gmail này</Text>
+                </Pressable>
+
+                <Text style={[styles.formLabel, { marginTop: 8 }]}>
+                  Hoặc dùng Google OAuth Client ID thật (nếu bạn có):
+                </Text>
+                <TextInput
+                  value={googleClientId}
+                  onChangeText={setGoogleClientId}
+                  placeholder="xxxx.apps.googleusercontent.com"
+                  placeholderTextColor={colors.textMuted}
+                  autoCapitalize="none"
+                  style={styles.input}
+                />
+                {googleClientId.trim() ? (
+                  <Pressable
+                    style={styles.oauthBtn}
+                    onPress={handleGoogleOAuth}
+                    disabled={isSigningIn}
+                  >
+                    <Text style={styles.oauthBtnText}>
+                      {isSigningIn ? 'Đang mở Google...' : 'Mở popup Google OAuth'}
+                    </Text>
+                  </Pressable>
+                ) : null}
+
+                {authError ? <Text style={styles.errText}>{authError}</Text> : null}
+              </View>
+            ) : null}
+          </View>
+        )}
+      </View>
+
+      {/* Quick JSON Import */}
       {showImport ? (
-        <View style={styles.specCard}>
+        <View style={styles.card}>
           <Text style={[TYPO.sectionTitle, { color: colors.textPrimary }]}>
             Nhập nhanh dữ liệu JSON trong ngày
           </Text>
@@ -96,7 +251,6 @@ export function RoadmapScreen({
             placeholder='Dán JSON {"date":"2026-11-25","weight":"88.0","foods":[...],"workouts":[...]}'
             placeholderTextColor={colors.textMuted}
             style={styles.jsonInput}
-            accessibilityLabel="Dán dữ liệu JSON"
           />
           {importStatus ? (
             <Text
@@ -109,18 +263,14 @@ export function RoadmapScreen({
               {importStatus.message}
             </Text>
           ) : null}
-          <Pressable
-            style={({ pressed }) => [styles.importBtn, pressed && styles.pressed]}
-            onPress={handleImportSubmit}
-            accessibilityRole="button"
-            accessibilityLabel="Cập nhật dữ liệu từ JSON"
-          >
-            <Text style={styles.importBtnText}>Cập nhật vào app</Text>
+          <Pressable style={styles.saveProfileBtn} onPress={handleImportSubmit}>
+            <Text style={styles.saveProfileText}>Cập nhật vào app</Text>
           </Pressable>
         </View>
       ) : null}
 
-      <View style={styles.heroCard}>
+      {/* Journey Progress */}
+      <View style={styles.card}>
         <View style={styles.heroTop}>
           <View>
             <Text style={styles.heroLabel}>Hoàn thành mục tiêu</Text>
@@ -131,23 +281,21 @@ export function RoadmapScreen({
             <Text style={styles.targetBoxVal}>{FITTRACK_CONFIG.TARGET_WEIGHT.toFixed(1)} kg</Text>
           </View>
         </View>
-
         <View style={styles.barTrack}>
           <View style={[styles.barFill, { width: `${pct}%` }]} />
         </View>
-
         <View style={styles.statsRow}>
-          <View style={styles.statItem}>
+          <View>
             <Text style={styles.statLabel}>Khởi điểm</Text>
             <Text style={styles.statVal}>{FITTRACK_CONFIG.START_WEIGHT.toFixed(1)} kg</Text>
           </View>
-          <View style={styles.statItem}>
+          <View>
             <Text style={styles.statLabel}>Đã giảm</Text>
             <Text style={[styles.statVal, { color: colors.emerald }]}>
               -{lostSoFar.toFixed(1)} kg
             </Text>
           </View>
-          <View style={styles.statItem}>
+          <View>
             <Text style={styles.statLabel}>Còn lại</Text>
             <Text style={[styles.statVal, { color: colors.amber }]}>
               {remainingKg.toFixed(1)} kg
@@ -156,112 +304,58 @@ export function RoadmapScreen({
         </View>
       </View>
 
-      <WeightChart points={weightHistory} />
+      {/* Auto-Projected + Actual Weight Chart */}
+      <WeightChart points={weightTrajectory} />
 
-      <View style={styles.specCard}>
-        <Text style={[TYPO.sectionTitle, { color: colors.textPrimary }]}>
-          Thông số siết mỡ FitTrack 70
-        </Text>
-        <View style={styles.specGrid}>
-          <View style={styles.specItem}>
-            <Text style={styles.specKey}>Trần Calo</Text>
-            <Text style={[styles.specVal, { color: colors.emerald }]}>
-              {FITTRACK_CONFIG.TARGET_KCAL} kcal
-            </Text>
-            <Text style={styles.specNote}>An toàn 1.350–1.500</Text>
-          </View>
-          <View style={styles.specItem}>
-            <Text style={styles.specKey}>Mục tiêu Đạm</Text>
-            <Text style={[styles.specVal, { color: colors.amber }]}>
-              {FITTRACK_CONFIG.TARGET_PROTEIN}g / ngày
-            </Text>
-            <Text style={styles.specNote}>Giữ cơ khi cắt carb</Text>
-          </View>
-          <View style={styles.specItem}>
-            <Text style={styles.specKey}>Nước & Điện giải</Text>
-            <Text style={[styles.specVal, { color: colors.cyan }]}>
-              {FITTRACK_CONFIG.TARGET_WATER} ml
-            </Text>
-            <Text style={styles.specNote}>Kèm chanh muối loãng</Text>
-          </View>
-          <View style={styles.specItem}>
-            <Text style={styles.specKey}>Tập & Ngủ</Text>
-            <Text style={styles.specVal}>{FITTRACK_CONFIG.WORKOUT_WINDOW}</Text>
-            <Text style={styles.specNote}>Ngủ trước {FITTRACK_CONFIG.SLEEP_TARGET}</Text>
-          </View>
-        </View>
-      </View>
-
+      {/* Daily History: Nạp bao nhiêu / Đốt bao nhiêu */}
       <Text style={[TYPO.sectionTitle, { color: colors.textPrimary }]}>
-        Lịch sử theo ngày ({historyList.length})
+        Lịch sử Nạp & Đốt theo ngày ({historyList.length})
       </Text>
 
-      {historyList.length === 0 ? (
-        <View style={styles.emptyCard}>
-          <Ionicons name="calendar-outline" size={22} color={colors.textMuted} />
-          <Text style={styles.emptyText}>
-            Chưa có dữ liệu lịch sử. Hãy bắt đầu ghi cân nặng và bữa ăn ở tab Hôm nay.
-          </Text>
-        </View>
-      ) : (
-        <View style={styles.historyGap}>
-          {historyList.map((day) => {
-            const kcal = day.meals.reduce((s, m) => s + m.kcal, 0);
-            const protein = day.meals.reduce((s, m) => s + m.protein, 0);
-            const inZone = kcal <= FITTRACK_CONFIG.SAFE_KCAL_MAX;
+      <View style={styles.listGap}>
+        {historyList.map((day) => {
+          const kcalIn = day.meals.reduce((s, m) => s + m.kcal, 0);
+          const protein = day.meals.reduce((s, m) => s + m.protein, 0);
+          const kcalBurned = calculateBurnedKcal(day);
+          const reps = (day.workouts ?? []).reduce(
+            (s, w) => (w.done && w.unit !== 'phút' ? s + w.reps : s),
+            0
+          );
+          const inZone = kcalIn <= FITTRACK_CONFIG.SAFE_KCAL_MAX;
 
-            return (
-              <View key={day.dateKey} style={styles.historyRow}>
-                <View style={styles.historyHead}>
-                  <Text style={styles.historyDate}>{day.dateKey}</Text>
-                  <View
-                    style={[
-                      styles.statusBadge,
-                      {
-                        backgroundColor: day.isClosedOut
-                          ? colors.emeraldDim
-                          : colors.surfaceElevated,
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.statusBadgeText,
-                        { color: day.isClosedOut ? colors.emerald : colors.textSecondary },
-                      ]}
-                    >
-                      {day.isClosedOut ? 'Đã chốt ngày' : 'Đang ghi nhận'}
-                    </Text>
+          return (
+            <View key={day.dateKey} style={styles.historyRow}>
+              <View style={styles.historyHead}>
+                <Text style={styles.historyDate}>{day.dateKey}</Text>
+                {day.weightKg !== null ? (
+                  <View style={styles.weightTag}>
+                    <Text style={styles.weightTagText}>{day.weightKg.toFixed(1)} kg</Text>
                   </View>
-                </View>
+                ) : null}
+              </View>
 
-                <View style={styles.historyMetrics}>
-                  <Text style={[styles.historyMetric, { color: inZone ? colors.emerald : colors.coral }]}>
-                    {kcal} kcal
+              <View style={styles.historyGrid}>
+                <View style={styles.hBox}>
+                  <Text style={styles.hLabel}>Nạp vào</Text>
+                  <Text style={[styles.hVal, { color: inZone ? colors.emerald : colors.coral }]}>
+                    {kcalIn} kcal
                   </Text>
-                  <Text style={styles.historyDot}>·</Text>
-                  <Text style={[styles.historyMetric, { color: colors.amber }]}>{protein}g đạm</Text>
-                  <Text style={styles.historyDot}>·</Text>
-                  <Text style={[styles.historyMetric, { color: colors.cyan }]}>{day.waterMl}ml</Text>
-                  <Text style={styles.historyDot}>·</Text>
-                  <Text style={styles.historyMetric}>
-                    Tập {day.completedWorkouts.length}/{EVENING_WORKOUT_PLAN.length}
-                    {(day.customWorkouts?.length ?? 0) > 0
-                      ? ` (${day.customWorkouts!.reduce((s, w) => (w.done ? s + w.reps : s), 0)} reps)`
-                      : ''}
+                </View>
+                <View style={styles.hBox}>
+                  <Text style={styles.hLabel}>Đốt tập</Text>
+                  <Text style={[styles.hVal, { color: colors.amber }]}>-{kcalBurned} kcal</Text>
+                </View>
+                <View style={styles.hBox}>
+                  <Text style={styles.hLabel}>Đạm / Tập</Text>
+                  <Text style={styles.hVal}>
+                    {protein}g · {reps} cái
                   </Text>
-                  {day.weightKg !== null ? (
-                    <>
-                      <Text style={styles.historyDot}>·</Text>
-                      <Text style={styles.historyMetric}>{day.weightKg.toFixed(1)} kg</Text>
-                    </>
-                  ) : null}
                 </View>
               </View>
-            );
-          })}
-        </View>
-      )}
+            </View>
+          );
+        })}
+      </View>
     </ScrollView>
   );
 }
@@ -281,44 +375,20 @@ const createStyles = (c: ThemePalette) =>
     },
     headerActions: {
       flexDirection: 'row',
-      alignItems: 'center',
       gap: 6,
     },
-    jsonInput: {
-      minHeight: 88,
-      backgroundColor: c.bg,
-      borderWidth: 1,
-      borderColor: c.borderStrong,
-      borderRadius: RADIUS.sm,
-      padding: 10,
-      color: c.textPrimary,
-      fontSize: 12,
-      textAlignVertical: 'top',
-    },
-    importBtn: {
-      height: 42,
-      borderRadius: RADIUS.sm,
-      backgroundColor: c.emerald,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    importBtnText: {
-      color: c.onAccent,
-      fontSize: 13,
-      fontWeight: '800',
-    },
-    themePill: {
+    pillBtn: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 6,
+      gap: 5,
       backgroundColor: c.surface,
       borderWidth: 1,
       borderColor: c.borderStrong,
-      paddingHorizontal: 11,
+      paddingHorizontal: 10,
       paddingVertical: 7,
       borderRadius: RADIUS.full,
     },
-    themePillText: {
+    pillBtnText: {
       color: c.textPrimary,
       fontSize: 12,
       fontWeight: '700',
@@ -329,13 +399,151 @@ const createStyles = (c: ThemePalette) =>
       fontWeight: '700',
       letterSpacing: 0.9,
     },
-    heroCard: {
+    card: {
       backgroundColor: c.surface,
       borderRadius: RADIUS.lg,
       borderWidth: 1,
       borderColor: c.border,
       padding: SPACING.md,
-      gap: 14,
+      gap: 12,
+    },
+    userRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    avatar: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+    },
+    avatarFallback: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: c.emeraldDim,
+      borderWidth: 1,
+      borderColor: c.emeraldBorder,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    avatarInitial: {
+      color: c.emerald,
+      fontSize: 18,
+      fontWeight: '800',
+    },
+    userName: {
+      color: c.textPrimary,
+      fontSize: 15,
+      fontWeight: '700',
+    },
+    userEmail: {
+      color: c.textSecondary,
+      fontSize: 12,
+    },
+    userStatus: {
+      color: c.emerald,
+      fontSize: 11,
+      fontWeight: '600',
+      marginTop: 2,
+    },
+    signOutBtn: {
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: RADIUS.sm,
+      backgroundColor: c.surfaceElevated,
+      borderWidth: 1,
+      borderColor: c.borderStrong,
+    },
+    signOutText: {
+      color: c.textSecondary,
+      fontSize: 12,
+      fontWeight: '700',
+    },
+    authBox: {
+      gap: 10,
+    },
+    authHead: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    googleBtn: {
+      minHeight: 44,
+      borderRadius: RADIUS.md,
+      backgroundColor: c.emerald,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+    },
+    googleBtnText: {
+      color: c.onAccent,
+      fontSize: 13.5,
+      fontWeight: '800',
+    },
+    authForm: {
+      gap: 8,
+      paddingTop: 6,
+      borderTopWidth: 1,
+      borderTopColor: c.border,
+    },
+    formLabel: {
+      color: c.textSecondary,
+      fontSize: 11.5,
+      fontWeight: '600',
+    },
+    input: {
+      height: 42,
+      backgroundColor: c.bg,
+      borderWidth: 1,
+      borderColor: c.borderStrong,
+      borderRadius: RADIUS.sm,
+      paddingHorizontal: 12,
+      color: c.textPrimary,
+      fontSize: 13.5,
+    },
+    saveProfileBtn: {
+      height: 42,
+      borderRadius: RADIUS.sm,
+      backgroundColor: c.emerald,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    saveProfileText: {
+      color: c.onAccent,
+      fontSize: 13,
+      fontWeight: '800',
+    },
+    oauthBtn: {
+      height: 40,
+      borderRadius: RADIUS.sm,
+      backgroundColor: c.surfaceElevated,
+      borderWidth: 1,
+      borderColor: c.borderStrong,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    oauthBtnText: {
+      color: c.textPrimary,
+      fontSize: 12.5,
+      fontWeight: '700',
+    },
+    errText: {
+      color: c.coral,
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    jsonInput: {
+      minHeight: 84,
+      backgroundColor: c.bg,
+      borderWidth: 1,
+      borderColor: c.borderStrong,
+      borderRadius: RADIUS.sm,
+      padding: 10,
+      color: c.textPrimary,
+      fontSize: 12,
+      textAlignVertical: 'top',
     },
     heroTop: {
       flexDirection: 'row',
@@ -349,7 +557,7 @@ const createStyles = (c: ThemePalette) =>
     },
     heroPct: {
       color: c.textPrimary,
-      fontSize: 34,
+      fontSize: 32,
       fontWeight: '800',
       fontVariant: ['tabular-nums'],
     },
@@ -387,10 +595,6 @@ const createStyles = (c: ThemePalette) =>
     statsRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      paddingTop: 4,
-    },
-    statItem: {
-      gap: 2,
     },
     statLabel: {
       color: c.textMuted,
@@ -403,60 +607,8 @@ const createStyles = (c: ThemePalette) =>
       fontWeight: '800',
       fontVariant: ['tabular-nums'],
     },
-    specCard: {
-      backgroundColor: c.surface,
-      borderRadius: RADIUS.lg,
-      borderWidth: 1,
-      borderColor: c.border,
-      padding: SPACING.md,
-      gap: SPACING.sm,
-    },
-    specGrid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: SPACING.sm,
-    },
-    specItem: {
-      width: '48%',
-      backgroundColor: c.surfaceMuted,
-      borderRadius: RADIUS.md,
-      borderWidth: 1,
-      borderColor: c.border,
-      padding: 12,
-      gap: 3,
-    },
-    specKey: {
-      color: c.textMuted,
-      fontSize: 11,
-      fontWeight: '600',
-    },
-    specVal: {
-      color: c.textPrimary,
-      fontSize: 15,
-      fontWeight: '800',
-      fontVariant: ['tabular-nums'],
-    },
-    specNote: {
-      color: c.textSecondary,
-      fontSize: 11,
-    },
-    emptyCard: {
-      backgroundColor: c.surface,
-      borderRadius: RADIUS.md,
-      borderWidth: 1,
-      borderColor: c.border,
-      padding: SPACING.lg,
-      alignItems: 'center',
-      gap: 8,
-    },
-    emptyText: {
-      color: c.textSecondary,
-      fontSize: 13,
-      textAlign: 'center',
-      lineHeight: 19,
-    },
-    historyGap: {
-      gap: SPACING.sm,
+    listGap: {
+      gap: 10,
     },
     historyRow: {
       backgroundColor: c.surface,
@@ -464,7 +616,7 @@ const createStyles = (c: ThemePalette) =>
       borderWidth: 1,
       borderColor: c.border,
       padding: 14,
-      gap: 8,
+      gap: 10,
     },
     historyHead: {
       flexDirection: 'row',
@@ -477,32 +629,39 @@ const createStyles = (c: ThemePalette) =>
       fontWeight: '700',
       fontVariant: ['tabular-nums'],
     },
-    statusBadge: {
+    weightTag: {
+      backgroundColor: c.emeraldDim,
       paddingHorizontal: 9,
-      paddingVertical: 4,
+      paddingVertical: 3,
       borderRadius: RADIUS.full,
     },
-    statusBadgeText: {
-      fontSize: 11,
-      fontWeight: '700',
-    },
-    historyMetrics: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      alignItems: 'center',
-      gap: 6,
-    },
-    historyMetric: {
-      color: c.textSecondary,
-      fontSize: 12,
-      fontWeight: '700',
+    weightTagText: {
+      color: c.emerald,
+      fontSize: 11.5,
+      fontWeight: '800',
       fontVariant: ['tabular-nums'],
     },
-    historyDot: {
+    historyGrid: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    hBox: {
+      flex: 1,
+      backgroundColor: c.surfaceMuted,
+      borderRadius: RADIUS.sm,
+      padding: 8,
+      gap: 2,
+    },
+    hLabel: {
       color: c.textMuted,
-      fontSize: 12,
+      fontSize: 10.5,
+      fontWeight: '600',
     },
-    pressed: {
-      opacity: 0.78,
+    hVal: {
+      color: c.textPrimary,
+      fontSize: 12.5,
+      fontWeight: '800',
+      fontVariant: ['tabular-nums'],
     },
+    pressed: { opacity: 0.78 },
   });

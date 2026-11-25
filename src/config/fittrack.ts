@@ -1,10 +1,12 @@
-import { DailyRecord, MealPreset, WorkoutItem } from '../types/fittrack';
+import { DailyRecord, HomeWorkoutTemplate, MealPreset } from '../types/fittrack';
 
 export const FITTRACK_CONFIG = {
   APP_NAME: 'FitTrack 70',
   MODE_LABEL: 'Zero-Starch Siết Mỡ',
   START_WEIGHT: 88.0,
   TARGET_WEIGHT: 70.0,
+  BASE_TDEE_KCAL: 2150, // Estimated resting/daily burn for ~88kg adult
+  KCAL_PER_KG: 7700,
   TARGET_KCAL: 1450,
   SAFE_KCAL_MIN: 1350,
   SAFE_KCAL_MAX: 1500,
@@ -12,9 +14,9 @@ export const FITTRACK_CONFIG = {
   TARGET_WATER: 3000,
   WORKOUT_WINDOW: '18:15 – 19:15',
   SLEEP_TARGET: '22:30',
-  CARDIO_TOTAL_SECONDS: 40 * 60, // 40 minutes
-  CARDIO_WALK_SECONDS: 3 * 60,   // 3 min brisk walk
-  CARDIO_RUN_SECONDS: 1 * 60,    // 1 min run / stair climb
+  CARDIO_TOTAL_SECONDS: 40 * 60,
+  CARDIO_WALK_SECONDS: 3 * 60,
+  CARDIO_RUN_SECONDS: 1 * 60,
 } as const;
 
 export const ZERO_STARCH_PRESETS: MealPreset[] = [
@@ -68,63 +70,102 @@ export const ZERO_STARCH_PRESETS: MealPreset[] = [
   },
 ];
 
-export const EVENING_WORKOUT_PLAN: WorkoutItem[] = [
+export const HOME_WORKOUT_LIBRARY: HomeWorkoutTemplate[] = [
   {
-    id: 'wk-ab-roller',
-    time: '18:15',
-    title: 'Đẩy con lăn 4 bánh',
-    detail: '3 hiệp × 6–8 cái (siết cơ lõi, không võng lưng)',
-    durationMin: 10,
+    id: 'hw-body-saw',
+    title: 'Plank cưa người (Body Saw)',
+    category: 'Bụng & Lõi',
+    defaultReps: 20,
+    unit: 'cái',
+    estimatedKcal: 45,
+    detail: 'Siết chặt cơ bụng, đẩy người tới lui chậm có kiểm soát',
+  },
+  {
+    id: 'hw-wall-crunch',
+    title: 'Gập bụng trên tường (Cơ bụng trên)',
+    category: 'Bụng & Lõi',
+    defaultReps: 50,
+    unit: 'cái',
+    estimatedKcal: 75,
+    detail: 'Chân kê vuông góc tường, thở ra khi cuộn vai lên',
+  },
+  {
+    id: 'hw-wall-oblique',
+    title: 'Gập bụng chéo trên tường (Cơ bụng bên)',
+    category: 'Bụng & Lõi',
+    defaultReps: 30,
+    unit: 'cái',
+    estimatedKcal: 55,
+    detail: 'Xoay chéo khuỷu tay về gối đối diện, siết eo 2 bên',
+  },
+  {
+    id: 'hw-ab-roller',
+    title: 'Đẩy con lăn 4 bánh tại nhà',
+    category: 'Bụng & Lõi',
+    defaultReps: 24,
+    unit: 'cái',
     estimatedKcal: 60,
+    detail: '3 hiệp × 8 cái, giữ lưng thẳng tuyệt đối không võng lưng',
   },
   {
-    id: 'wk-wall-crunch',
-    time: '18:25',
-    title: 'Gập bụng trên tường',
-    detail: '3 hiệp × 20 cái (bụng trên - bụng bên - nâng hông)',
-    durationMin: 10,
+    id: 'hw-squat',
+    title: 'Squat không tạ tại nhà',
+    category: 'Toàn thân',
+    defaultReps: 40,
+    unit: 'cái',
+    estimatedKcal: 85,
+    detail: '2 hiệp × 20 cái, đốt mỡ đùi & tăng nhịp tim nhanh',
+  },
+  {
+    id: 'hw-pushup',
+    title: 'Chống đẩy tại nhà (Push-up)',
+    category: 'Toàn thân',
+    defaultReps: 30,
+    unit: 'cái',
     estimatedKcal: 70,
+    detail: '3 hiệp × 10 cái, giữ cơ ngực & vai săn chắc khi giảm cân',
   },
   {
-    id: 'wk-interval-cardio',
-    time: '18:35',
-    title: 'Cardio đốt mỡ ngắt quãng',
-    detail: '40 phút (3p đi bộ cực nhanh + 1p chạy bộ/leo cầu thang)',
-    durationMin: 40,
+    id: 'hw-jumping-jacks',
+    title: 'Bật nhảy tại chỗ (Jumping Jacks)',
+    category: 'Cardio tại nhà',
+    defaultReps: 60,
+    unit: 'cái',
+    estimatedKcal: 90,
+    detail: '3 hiệp × 20 cái, khởi động đốt mỡ cực nhanh tại phòng',
+  },
+  {
+    id: 'hw-cardio-40',
+    title: 'Cardio đốt mỡ ngắt quãng (40p)',
+    category: 'Cardio tại nhà',
+    defaultReps: 40,
+    unit: 'phút',
     estimatedKcal: 400,
-    hasTimer: true,
+    detail: '3 phút đi bộ cực nhanh + 1 phút chạy bộ / leo cầu thang',
   },
 ];
 
-export const DAILY_ROUTINE_STEPS = [
-  { id: 'rt-weight', time: '06:30', label: 'Cân buổi sáng & ghi nhận' },
-  { id: 'rt-breakfast', time: '07:15', label: '3 Trứng + Americano + 500ml nước' },
-  { id: 'rt-workout', time: '18:15', label: 'Hoàn thành buổi tập 18h15–19h15' },
-  { id: 'rt-closeout', time: '22:00', label: 'Kiểm tra Calo ≤ 1.450 & Chốt ngày' },
-] as const;
-
 export const SEEDED_DAILY_LOGS: { seedId: string; record: DailyRecord }[] = [
   {
-    seedId: 'seed-2026-11-25-v1',
+    seedId: 'seed-2026-11-25-v2',
     record: {
       dateKey: '2026-11-25',
       weightKg: 88.0,
       waterMl: 0,
-      completedWorkouts: ['wk-wall-crunch'],
       cardioElapsedSec: 0,
       isClosedOut: false,
       meals: [
-        { id: 'seed-20261125-f6', name: 'Ham gà chay (7 miếng)', kcal: 190, protein: 14, timestamp: '19:30' },
-        { id: 'seed-20261125-f5', name: 'Trứng gà luộc (4 quả)', kcal: 300, protein: 24, timestamp: '19:30' },
-        { id: 'seed-20261125-f4', name: 'Trứng gà tiềm (2 quả)', kcal: 147, protein: 13, timestamp: '15:30' },
-        { id: 'seed-20261125-f3', name: 'Cơm nắm thịt nướng phô mai X2 (113g)', kcal: 209, protein: 6, timestamp: '12:15' },
-        { id: 'seed-20261125-f2', name: 'Set Sushi Ngũ Phúc (141g)', kcal: 213, protein: 7, timestamp: '12:00' },
-        { id: 'seed-20261125-f1', name: 'Cà phê sữa KODOCHI (100ml)', kcal: 135, protein: 2, timestamp: '08:00' },
+        { id: 'seed-20261125-f6', name: 'Ham gà chay (7 miếng)', kcal: 190, protein: 14, timestamp: '19:30', source: 'ai_photo' },
+        { id: 'seed-20261125-f5', name: 'Trứng gà luộc (4 quả)', kcal: 300, protein: 24, timestamp: '19:30', source: 'ai_photo' },
+        { id: 'seed-20261125-f4', name: 'Trứng gà tiềm (2 quả)', kcal: 147, protein: 13, timestamp: '15:30', source: 'ai_photo' },
+        { id: 'seed-20261125-f3', name: 'Cơm nắm thịt nướng phô mai X2 (113g)', kcal: 209, protein: 6, timestamp: '12:15', source: 'ai_photo' },
+        { id: 'seed-20261125-f2', name: 'Set Sushi Ngũ Phúc (141g)', kcal: 213, protein: 7, timestamp: '12:00', source: 'ai_photo' },
+        { id: 'seed-20261125-f1', name: 'Cà phê sữa KODOCHI (100ml)', kcal: 135, protein: 2, timestamp: '08:00', source: 'ai_photo' },
       ],
-      customWorkouts: [
-        { id: 'seed-20261125-w1', title: 'Plank cưa người (Body Saw)', reps: 20, done: true },
-        { id: 'seed-20261125-w2', title: 'Gập bụng trên tường (Cơ bụng trên)', reps: 50, done: true },
-        { id: 'seed-20261125-w3', title: 'Gập bụng chéo trên tường (Cơ bụng bên)', reps: 30, done: true },
+      workouts: [
+        { id: 'seed-20261125-w1', title: 'Plank cưa người (Body Saw)', reps: 20, unit: 'cái', estimatedKcal: 45, done: true, source: 'app' },
+        { id: 'seed-20261125-w2', title: 'Gập bụng trên tường (Cơ bụng trên)', reps: 50, unit: 'cái', estimatedKcal: 75, done: true, source: 'app' },
+        { id: 'seed-20261125-w3', title: 'Gập bụng chéo trên tường (Cơ bụng bên)', reps: 30, unit: 'cái', estimatedKcal: 55, done: true, source: 'app' },
       ],
     },
   },
